@@ -726,6 +726,7 @@ func (c *APIClient) ParseUserListResponse(userInfoResponse *[]UserResponse) (*[]
 			UID:         user.ID,
 			UUID:        user.UUID,
 			Passwd:      user.Passwd,
+			Email:       user.Email,
 			SpeedLimit:  speedLimit,
 			DeviceLimit: deviceLimit,
 			Port:        user.Port,
@@ -828,6 +829,7 @@ func (c *APIClient) ParseSSPanelNodeInfo(nodeInfoResponse *NodeInfoResponse) (*a
 		Header:            nodeConfig.Header,
 		EnableREALITY:     nodeConfig.EnableREALITY,
 		REALITYConfig:     realityConfig,
+		ServerKey:         nodeConfig.ServerKey,
 	}
 
 	return nodeInfo, nil
