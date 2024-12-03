@@ -33,12 +33,14 @@ type CustomConfig struct {
 	Flow           string          `json:"flow"`
 	EnableREALITY  bool            `json:"enable_reality"`
 	RealityOpts    *REALITYConfig  `json:"reality-opts"`
+	ServerKey      string          `json:"server_key"`
 }
 
 // UserResponse is the response of user
 type UserResponse struct {
 	ID          int     `json:"id"`
 	Passwd      string  `json:"passwd"`
+	Email       string  `json:"email"`
 	Port        uint32  `json:"port"`
 	Method      string  `json:"method"`
 	SpeedLimit  float64 `json:"node_speedlimit"`
