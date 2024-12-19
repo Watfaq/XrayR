@@ -209,6 +209,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 	newUserInfo, err := c.apiClient.GetUserList()
 	if err != nil {
 		if err.Error() == api.UserNotModified {
+			c.logger.Println("User list not modified")
 			usersChanged = false
 			newUserInfo = c.userList
 		} else {
@@ -282,6 +283,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 	} else {
 		var deleted, added []api.UserInfo
 		if usersChanged {
+			c.logger.Println("User list changed")
 			deleted, added = compareUserList(c.userList, newUserInfo)
 			if len(deleted) > 0 {
 				deletedEmail := make([]string, len(deleted))
