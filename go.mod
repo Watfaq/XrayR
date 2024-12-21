@@ -3,29 +3,29 @@ module github.com/XrayR-project/XrayR
 go 1.22.0
 
 require (
-	dario.cat/mergo v1.0.0
+	dario.cat/mergo v1.0.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/eko/gocache/lib/v4 v4.1.6
 	github.com/eko/gocache/store/go_cache/v4 v4.2.2
-	github.com/eko/gocache/store/redis/v4 v4.2.1
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/eko/gocache/store/redis/v4 v4.2.2
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-acme/lego/v4 v4.16.1
-	github.com/go-resty/resty/v2 v2.13.1
+	github.com/go-resty/resty/v2 v2.16.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/r3labs/diff/v2 v2.15.1
 	github.com/redis/go-redis/v9 v9.7.0
-	github.com/sagernet/sing v0.4.1
+	github.com/sagernet/sing v0.5.1
 	github.com/sagernet/sing-shadowsocks v0.2.7
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/viper v1.18.2
-	github.com/stretchr/testify v1.9.0
+	github.com/spf13/viper v1.19.0
+	github.com/stretchr/testify v1.10.0
 	github.com/xtls/xray-core v1.8.24
-	golang.org/x/crypto v0.28.0
-	golang.org/x/net v0.28.0
-	golang.org/x/time v0.7.0
-	google.golang.org/protobuf v1.34.2
+	golang.org/x/crypto v0.31.0
+	golang.org/x/net v0.33.0
+	golang.org/x/time v0.8.0
+	google.golang.org/protobuf v1.36.0
 )
 
 require (
@@ -195,7 +195,7 @@ require (
 	github.com/oracle/oci-go-sdk v24.3.0+incompatible // indirect
 	github.com/ovh/go-ovh v1.4.3 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pires/go-proxyproto v0.7.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -270,13 +270,13 @@ require (
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173 // indirect
-	google.golang.org/api v0.170.0 // indirect
+	google.golang.org/api v0.171.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240314234333-6e1732d8331c // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117 // indirect
