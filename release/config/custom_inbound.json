@@ -1,19 +1,18 @@
 [
   {
-    "listen": "127.0.0.1",
-    "port": 1234,
-    "protocol": "socks",
+    "listen": "0.0.0.0",
+    "port": 65001,
+    "protocol": "shadowsocks",
     "settings": {
-      "auth": "noauth",
-      "accounts": [
+      "method": "2022-blake3-aes-256-gcm",
+      "password": "yv4n5ZOXfdoTzpGVAx932unryNkO2Q61IHfzW3Sqnu8=",
+      "clients": [
         {
-          "user": "my-username",
-          "pass": "my-password"
+          "password": "dVdRbTNxUVZ3Uko3Y0ozQ3dkWmlGZW44cGNqNXVvUzY=",
+          "email": "my user"
         }
       ],
-      "udp": false,
-      "ip": "127.0.0.1",
-      "userLevel": 0
+      "network": "tcp,udp"
     }
   }
 ]

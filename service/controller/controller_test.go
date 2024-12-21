@@ -12,7 +12,7 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 
 	"github.com/XrayR-project/XrayR/api"
-	"github.com/XrayR-project/XrayR/api/sspanel"
+	"github.com/XrayR-project/XrayR/api/fac"
 	_ "github.com/XrayR-project/XrayR/cmd/distro/all"
 	"github.com/XrayR-project/XrayR/common/mylego"
 	. "github.com/XrayR-project/XrayR/service/controller"
@@ -40,10 +40,11 @@ func TestController(t *testing.T) {
 	// 	}}
 
 	server, err := core.New(config)
-	defer server.Close()
 	if err != nil {
 		t.Errorf("failed to create instance: %s", err)
+		return
 	}
+	defer server.Close()
 	if err = server.Start(); err != nil {
 		t.Errorf("Failed to start instance: %s", err)
 	}
@@ -60,10 +61,10 @@ func TestController(t *testing.T) {
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
 		Key:      "123",
-		NodeID:   41,
+		NodeID:   "41",
 		NodeType: "V2ray",
 	}
-	apiClient := sspanel.New(apiConfig)
+	apiClient := fac.New(apiConfig)
 	c := New(server, apiClient, controlerConfig, "SSpanel")
 	fmt.Println("Sleep 1s")
 	err = c.Start()

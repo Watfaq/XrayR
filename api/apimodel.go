@@ -16,7 +16,7 @@ const (
 // Config API config
 type Config struct {
 	APIHost             string  `mapstructure:"ApiHost"`
-	NodeID              int     `mapstructure:"NodeID"`
+	NodeID              string  `mapstructure:"NodeID"`
 	Key                 string  `mapstructure:"ApiKey"`
 	NodeType            string  `mapstructure:"NodeType"`
 	EnableVless         bool    `mapstructure:"EnableVless"`
@@ -40,7 +40,7 @@ type NodeInfo struct {
 	AcceptProxyProtocol bool
 	Authority           string
 	NodeType            string // Must be V2ray, Trojan, and Shadowsocks
-	NodeID              int
+	NodeID              string
 	Port                uint32
 	SpeedLimit          uint64 // Bps
 	AlterID             uint16
@@ -106,7 +106,7 @@ type UserTraffic struct {
 
 type ClientInfo struct {
 	APIHost  string
-	NodeID   int
+	NodeID   string
 	Key      string
 	NodeType string
 }
