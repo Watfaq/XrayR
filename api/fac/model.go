@@ -1,4 +1,4 @@
-package sspanel
+package fac
 
 import "encoding/json"
 

@@ -11,7 +11,7 @@ import (
 func TestBuildV2ray(t *testing.T) {
 	nodeInfo := &api.NodeInfo{
 		NodeType:          "V2ray",
-		NodeID:            1,
+		NodeID:            "1",
 		Port:              1145,
 		SpeedLimit:        0,
 		AlterID:           2,
@@ -38,7 +38,7 @@ func TestBuildV2ray(t *testing.T) {
 func TestBuildTrojan(t *testing.T) {
 	nodeInfo := &api.NodeInfo{
 		NodeType:          "Trojan",
-		NodeID:            1,
+		NodeID:            "1",
 		Port:              1145,
 		SpeedLimit:        0,
 		AlterID:           2,
@@ -69,7 +69,7 @@ func TestBuildTrojan(t *testing.T) {
 func TestBuildSS(t *testing.T) {
 	nodeInfo := &api.NodeInfo{
 		NodeType:          "Shadowsocks",
-		NodeID:            1,
+		NodeID:            "1",
 		Port:              1145,
 		SpeedLimit:        0,
 		AlterID:           2,

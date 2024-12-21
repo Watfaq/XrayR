@@ -1,21 +1,21 @@
-package sspanel_test
+package fac_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/XrayR-project/XrayR/api"
-	"github.com/XrayR-project/XrayR/api/sspanel"
+	"github.com/XrayR-project/XrayR/api/fac"
 )
 
 func CreateClient() api.API {
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
 		Key:      "123",
-		NodeID:   3,
+		NodeID:   "3",
 		NodeType: "V2ray",
 	}
-	client := sspanel.New(apiConfig)
+	client := fac.New(apiConfig)
 	return client
 }
 
@@ -33,10 +33,10 @@ func TestGetSSNodeInfo(t *testing.T) {
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
 		Key:      "123",
-		NodeID:   64,
+		NodeID:   "64",
 		NodeType: "Shadowsocks",
 	}
-	client := sspanel.New(apiConfig)
+	client := fac.New(apiConfig)
 	nodeInfo, err := client.GetNodeInfo()
 	if err != nil {
 		t.Error(err)
@@ -48,10 +48,10 @@ func TestGetTrojanNodeInfo(t *testing.T) {
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
 		Key:      "123",
-		NodeID:   72,
+		NodeID:   "72",
 		NodeType: "Trojan",
 	}
-	client := sspanel.New(apiConfig)
+	client := fac.New(apiConfig)
 	nodeInfo, err := client.GetNodeInfo()
 	if err != nil {
 		t.Error(err)
