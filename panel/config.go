@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	LogConfig          *LogConfig        `mapstructure:"Log"`
-	DnsConfigPath      string            `mapstructure:"DnsConfigPath"`
+	DNSConfigPath      string            `mapstructure:"DnsConfigPath"`
 	InboundConfigPath  string            `mapstructure:"InboundConfigPath"`
 	OutboundConfigPath string            `mapstructure:"OutboundConfigPath"`
 	RouteConfigPath    string            `mapstructure:"RouteConfigPath"`
@@ -17,7 +17,7 @@ type Config struct {
 
 type NodesConfig struct {
 	PanelType        string             `mapstructure:"PanelType"`
-	ApiConfig        *api.Config        `mapstructure:"ApiConfig"`
+	APIConfig        *api.Config        `mapstructure:"ApiConfig"`
 	ControllerConfig *controller.Config `mapstructure:"ControllerConfig"`
 }
 

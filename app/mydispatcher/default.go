@@ -4,7 +4,9 @@ package mydispatcher
 
 import (
 	"context"
+	errorsType "errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +34,10 @@ import (
 
 var errSniffingTimeout = newError("timeout on sniffing")
 
+const (
+	ProtocolFakeDNS = "fakedns"
+)
+
 type cachedReader struct {
 	sync.Mutex
 	reader *pipe.Reader
@@ -47,7 +53,11 @@ func (r *cachedReader) Cache(b *buf.Buffer) {
 	b.Clear()
 	rawBytes := b.Extend(buf.Size)
 	n := r.cache.Copy(rawBytes)
-	b.Resize(0, int32(n))
+	if n > math.MaxInt32 {
+		b.Resize(0, math.MaxInt32)
+	} else {
+		b.Resize(0, int32(n)) //nolint:gosec //n is not user input
+	}
 	r.Unlock()
 }
 
@@ -103,15 +113,19 @@ type DefaultDispatcher struct {
 	RuleManager *rule.Manager
 }
 
-func init() {
-	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+func init() { //nolint:gochecknoinits // bypass
+	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config any) (any, error) {
 		d := new(DefaultDispatcher)
-		if err := core.RequireFeatures(ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
-			core.RequireFeatures(ctx, func(fdns dns.FakeDNSEngine) {
-				d.fdns = fdns
-			})
-			return d.Init(config.(*Config), om, router, pm, sm, dc)
-		}); err != nil {
+		if err := core.RequireFeatures(
+			ctx, func(om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dc dns.Client) error {
+				err := core.RequireFeatures(ctx, func(fdns dns.FakeDNSEngine) {
+					d.fdns = fdns
+				})
+				if err != nil {
+					return err
+				}
+				return d.Init(config.(*Config), om, router, pm, sm, dc)
+			}); err != nil {
 			return nil, err
 		}
 		return d, nil
@@ -119,19 +133,25 @@ func init() {
 }
 
 // Init initializes DefaultDispatcher.
-func (d *DefaultDispatcher) Init(config *Config, om outbound.Manager, router routing.Router, pm policy.Manager, sm stats.Manager, dns dns.Client) error {
+func (d *DefaultDispatcher) Init(
+	_ *Config,
+	om outbound.Manager,
+	router routing.Router,
+	pm policy.Manager,
+	sm stats.Manager,
+	dnsClient dns.Client) error {
 	d.ohm = om
 	d.router = router
 	d.policy = pm
 	d.stats = sm
 	d.Limiter = limiter.New()
 	d.RuleManager = rule.New()
-	d.dns = dns
+	d.dns = dnsClient
 	return nil
 }
 
 // Type implements common.HasType.
-func (*DefaultDispatcher) Type() interface{} {
+func (*DefaultDispatcher) Type() any {
 	return routing.DispatcherType()
 }
 
@@ -145,17 +165,20 @@ func (*DefaultDispatcher) Close() error {
 	return nil
 }
 
-func (d *DefaultDispatcher) getLink(ctx context.Context, network net.Network, sniffing session.SniffingRequest) (*transport.Link, *transport.Link, error) {
+func (d *DefaultDispatcher) getLink(
+	ctx context.Context,
+	_ net.Network,
+	_ session.SniffingRequest) (inboundLink, outboundLink *transport.Link, err error) {
 	opt := pipe.OptionsFromContext(ctx)
 	uplinkReader, uplinkWriter := pipe.New(opt...)
 	downlinkReader, downlinkWriter := pipe.New(opt...)
 
-	inboundLink := &transport.Link{
+	inboundLink = &transport.Link{
 		Reader: downlinkReader,
 		Writer: uplinkWriter,
 	}
 
-	outboundLink := &transport.Link{
+	outboundLink = &transport.Link{
 		Reader: uplinkReader,
 		Writer: downlinkWriter,
 	}
@@ -166,15 +189,21 @@ func (d *DefaultDispatcher) getLink(ctx context.Context, network net.Network, sn
 		user = sessionInbound.User
 	}
 
-	if user != nil && len(user.Email) > 0 {
+	if user != nil && user.Email != "" {
 		// Speed Limit and Device Limit
 		bucket, ok, reject := d.Limiter.GetUserBucket(sessionInbound.Tag, user.Email, sessionInbound.Source.Address.IP().String())
 		if reject {
 			errors.LogWarning(ctx, "Devices reach the limit: ", user.Email)
 			common.Close(outboundLink.Writer)
 			common.Close(inboundLink.Writer)
-			common.Interrupt(outboundLink.Reader)
-			common.Interrupt(inboundLink.Reader)
+			err = common.Interrupt(outboundLink.Reader)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = common.Interrupt(inboundLink.Reader)
+			if err != nil {
+				return nil, nil, err
+			}
 			return nil, nil, newError("Devices reach the limit: ", user.Email)
 		}
 		if ok {
@@ -206,10 +235,14 @@ func (d *DefaultDispatcher) getLink(ctx context.Context, network net.Network, sn
 	return inboundLink, outboundLink, nil
 }
 
-func (d *DefaultDispatcher) shouldOverride(ctx context.Context, result SniffResult, request session.SniffingRequest, destination net.Destination) bool {
+func (d *DefaultDispatcher) shouldOverride(
+	ctx context.Context,
+	result SniffResult,
+	request session.SniffingRequest,
+	destination net.Destination) bool {
 	domain := result.Domain()
 	for _, d := range request.ExcludeForDomain {
-		if strings.ToLower(domain) == d {
+		if strings.EqualFold(domain, d) {
 			return false
 		}
 	}
@@ -221,7 +254,7 @@ func (d *DefaultDispatcher) shouldOverride(ctx context.Context, result SniffResu
 		if strings.HasPrefix(protocolString, p) || strings.HasPrefix(p, protocolString) {
 			return true
 		}
-		if fkr0, ok := d.fdns.(dns.FakeDNSEngineRev0); ok && protocolString != "bittorrent" && p == "fakedns" &&
+		if fkr0, ok := d.fdns.(dns.FakeDNSEngineRev0); ok && protocolString != "bittorrent" && p == ProtocolFakeDNS &&
 			destination.Address.Family().IsIP() && fkr0.IsIPInIPPool(destination.Address) {
 			errors.LogInfo(ctx, "Using sniffer ", protocolString, " since the fake DNS missed")
 			return true
@@ -256,18 +289,18 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 	}
 
 	sniffingRequest := content.SniffingRequest
-	inbound, outbound, err := d.getLink(ctx, destination.Network, sniffingRequest)
+	inbound, outboundLink, err := d.getLink(ctx, destination.Network, sniffingRequest)
 	if err != nil {
 		return nil, err
 	}
 	if !sniffingRequest.Enabled {
-		go d.routedDispatch(ctx, outbound, destination)
+		go d.routedDispatch(ctx, outboundLink, destination)
 	} else {
 		go func() {
 			cReader := &cachedReader{
-				reader: outbound.Reader.(*pipe.Reader),
+				reader: outboundLink.Reader.(*pipe.Reader),
 			}
-			outbound.Reader = cReader
+			outboundLink.Reader = cReader
 			result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
 			if err == nil {
 				content.Protocol = result.Protocol()
@@ -276,20 +309,20 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 				domain := result.Domain()
 				errors.LogInfo(ctx, "sniffed domain: ", domain)
 				destination.Address = net.ParseAddress(domain)
-				if sniffingRequest.RouteOnly && result.Protocol() != "fakedns" {
+				if sniffingRequest.RouteOnly && result.Protocol() != ProtocolFakeDNS {
 					ob.RouteTarget = destination
 				} else {
 					ob.Target = destination
 				}
 			}
-			d.routedDispatch(ctx, outbound, destination)
+			d.routedDispatch(ctx, outboundLink, destination)
 		}()
 	}
 	return inbound, nil
 }
 
 // DispatchLink implements routing.Dispatcher.
-func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.Destination, outbound *transport.Link) error {
+func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.Destination, outboundLink *transport.Link) error {
 	if !destination.IsValid() {
 		return newError("Dispatcher: Invalid destination.")
 	}
@@ -308,13 +341,13 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 	}
 	sniffingRequest := content.SniffingRequest
 	if !sniffingRequest.Enabled {
-		go d.routedDispatch(ctx, outbound, destination)
+		go d.routedDispatch(ctx, outboundLink, destination)
 	} else {
 		go func() {
 			cReader := &cachedReader{
-				reader: outbound.Reader.(*pipe.Reader),
+				reader: outboundLink.Reader.(*pipe.Reader),
 			}
-			outbound.Reader = cReader
+			outboundLink.Reader = cReader
 			result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
 			if err == nil {
 				content.Protocol = result.Protocol()
@@ -323,13 +356,13 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 				domain := result.Domain()
 				errors.LogInfo(ctx, "sniffed domain: ", domain)
 				destination.Address = net.ParseAddress(domain)
-				if sniffingRequest.RouteOnly && result.Protocol() != "fakedns" {
+				if sniffingRequest.RouteOnly && result.Protocol() != ProtocolFakeDNS {
 					ob.RouteTarget = destination
 				} else {
 					ob.Target = destination
 				}
 			}
-			d.routedDispatch(ctx, outbound, destination)
+			d.routedDispatch(ctx, outboundLink, destination)
 		}()
 	}
 
@@ -363,7 +396,7 @@ func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, netw
 				cReader.Cache(payload)
 				if !payload.IsEmpty() {
 					result, err := sniffer.Sniff(ctx, payload.Bytes(), network)
-					if err != common.ErrNoClue {
+					if !errorsType.Is(err, common.ErrNoClue) {
 						return result, err
 					}
 				}
@@ -406,9 +439,11 @@ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.
 	if sessionInbound.User != nil {
 		if d.RuleManager.Detect(sessionInbound.Tag, destination.String(), sessionInbound.User.Email) {
 			errors.LogError(ctx, fmt.Sprintf("User %s access %s reject by rule", sessionInbound.User.Email, destination.String()))
-			newError("destination is reject by rule")
 			common.Close(link.Writer)
-			common.Interrupt(link.Reader)
+			err := common.Interrupt(link.Reader)
+			if err != nil {
+				errors.LogError(ctx, "interrupt link reader failed: ", err)
+			}
 			return
 		}
 	}
@@ -425,7 +460,10 @@ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.
 		} else {
 			errors.LogError(ctx, "non existing tag for platform initialized detour: ", forcedOutboundTag)
 			common.Close(link.Writer)
-			common.Interrupt(link.Reader)
+			err := common.Interrupt(link.Reader)
+			if err != nil {
+				errors.LogError(ctx, "interrupt link reader failed: ", err)
+			}
 			return
 		}
 	} else if d.router != nil {
@@ -455,7 +493,10 @@ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.
 	if handler == nil {
 		errors.LogInfo(ctx, "default outbound handler not exist")
 		common.Close(link.Writer)
-		common.Interrupt(link.Reader)
+		err := common.Interrupt(link.Reader)
+		if err != nil {
+			errors.LogError(ctx, "interrupt link reader failed: ", err)
+		}
 		return
 	}
 

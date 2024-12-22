@@ -167,7 +167,7 @@ func (c *Controller) buildUserTag(user *api.UserInfo) string {
 	return fmt.Sprintf("%s|%s|%d", c.Tag, user.Email, user.UID)
 }
 
-func (c *Controller) checkShadowsocksPassword(password string, method string) (string, error) {
+func (c *Controller) checkShadowsocksPassword(password, method string) (string, error) {
 	if strings.Contains(c.panelType, "V2board") {
 		var userKey string
 		if len(password) < 16 {
@@ -182,7 +182,6 @@ func (c *Controller) checkShadowsocksPassword(password string, method string) (s
 			userKey = password[:32]
 		}
 		return base64.StdEncoding.EncodeToString([]byte(userKey)), nil
-	} else {
-		return password, nil
 	}
+	return password, nil
 }

@@ -23,7 +23,7 @@ var (
 	cfgFile string
 	rootCmd = &cobra.Command{
 		Use: "XrayR",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if err := run(); err != nil {
 				log.Fatal(err)
 			}
@@ -55,7 +55,6 @@ func getConfig() *viper.Viper {
 		config.SetConfigName("config")
 		config.SetConfigType("yml")
 		config.AddConfigPath(".")
-
 	}
 
 	if err := config.ReadInConfig(); err != nil {
@@ -73,7 +72,7 @@ func run() error {
 	config := getConfig()
 	panelConfig := &panel.Config{}
 	if err := config.Unmarshal(panelConfig); err != nil {
-		return fmt.Errorf("Parse config file %v failed: %s \n", cfgFile, err)
+		return fmt.Errorf("parse config file %v failed: %w", cfgFile, err)
 	}
 
 	if panelConfig.LogConfig.Level == "debug" {
@@ -110,7 +109,7 @@ func run() error {
 	runtime.GC()
 	// Running backend
 	osSignals := make(chan os.Signal, 1)
-	signal.Notify(osSignals, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 	<-osSignals
 
 	return nil

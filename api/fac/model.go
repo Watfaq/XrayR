@@ -57,7 +57,7 @@ type Response struct {
 
 // PostData is the data structure of post data
 type PostData struct {
-	Data interface{} `json:"data"`
+	Data any `json:"data"`
 }
 
 // SystemLoad is the data structure of system load
