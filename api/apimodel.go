@@ -13,6 +13,26 @@ const (
 	RuleNotModified = "rules not modified"
 )
 
+const (
+	TransportProtocolTCP  = "tcp"
+	TransportProtocolWS   = "ws"
+	TransportProtocolGRPC = "grpc"
+)
+
+const (
+	NodeTypeV2ray             = "V2ray"
+	NodeTypeTrojan            = "Trojan"
+	NodeTypeShadowsocks       = "Shadowsocks"
+	NodeTypeShadowsocksPlugin = "Shadowsocks-Plugin"
+	NodeTypeVLess             = "Vless"
+	NodeTypeVMESS             = "Vmess"
+	NodeTypeDokodemo          = "dokodemo-door"
+)
+
+const (
+	SecurityTypeTLS = "tls"
+)
+
 // Config API config
 type Config struct {
 	APIHost             string  `mapstructure:"ApiHost"`
@@ -58,7 +78,7 @@ type NodeInfo struct {
 	ServiceName         string
 	Method              string
 	Header              json.RawMessage
-	HttpHeaders         map[string]*conf.StringList
+	HTTPHeaders         map[string]*conf.StringList
 	Headers             map[string]string
 	NameServerConfig    []*conf.NameServerConfig
 	EnableREALITY       bool

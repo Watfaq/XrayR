@@ -2,6 +2,7 @@
 package serverstatus
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -11,16 +12,15 @@ import (
 )
 
 // GetSystemInfo get the system info of a given periodic
-func GetSystemInfo() (Cpu float64, Mem float64, Disk float64, Uptime uint64, err error) {
-
+func GetSystemInfo() (c, m, d float64, up uint64, err error) {
 	errorString := ""
 
 	cpuPercent, err := cpu.Percent(0, false)
 	// Check if cpuPercent is empty
 	if len(cpuPercent) > 0 && err == nil {
-		Cpu = cpuPercent[0]
+		c = cpuPercent[0]
 	} else {
-		Cpu = 0
+		c = 0
 		errorString += fmt.Sprintf("get cpu usage failed: %s ", err)
 	}
 
@@ -28,26 +28,26 @@ func GetSystemInfo() (Cpu float64, Mem float64, Disk float64, Uptime uint64, err
 	if err != nil {
 		errorString += fmt.Sprintf("get mem usage failed: %s ", err)
 	} else {
-		Mem = memUsage.UsedPercent
+		m = memUsage.UsedPercent
 	}
 
 	diskUsage, err := disk.Usage("/")
 	if err != nil {
 		errorString += fmt.Sprintf("get disk usage failed: %s ", err)
 	} else {
-		Disk = diskUsage.UsedPercent
+		d = diskUsage.UsedPercent
 	}
 
 	uptime, err := host.Uptime()
 	if err != nil {
 		errorString += fmt.Sprintf("get uptime failed: %s ", err)
 	} else {
-		Uptime = uptime
+		up = uptime
 	}
 
 	if errorString != "" {
-		err = fmt.Errorf(errorString)
+		err = errors.New(errorString)
 	}
 
-	return Cpu, Mem, Disk, Uptime, err
+	return c, m, d, up, err
 }

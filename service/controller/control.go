@@ -32,7 +32,7 @@ func (c *Controller) addInbound(config *core.InboundHandlerConfig) error {
 	}
 	handler, ok := rawHandler.(inbound.Handler)
 	if !ok {
-		return fmt.Errorf("not an InboundHandler: %s", err)
+		return fmt.Errorf("not an InboundHandler: %w", err)
 	}
 	if err := c.ibm.AddHandler(context.Background(), handler); err != nil {
 		return err
@@ -47,7 +47,7 @@ func (c *Controller) addOutbound(config *core.OutboundHandlerConfig) error {
 	}
 	handler, ok := rawHandler.(outbound.Handler)
 	if !ok {
-		return fmt.Errorf("not an InboundHandler: %s", err)
+		return fmt.Errorf("not an InboundHandler: %w", err)
 	}
 	if err := c.obm.AddHandler(context.Background(), handler); err != nil {
 		return err
@@ -58,7 +58,7 @@ func (c *Controller) addOutbound(config *core.OutboundHandlerConfig) error {
 func (c *Controller) addUsers(users []*protocol.User, tag string) error {
 	handler, err := c.ibm.GetHandler(context.Background(), tag)
 	if err != nil {
-		return fmt.Errorf("no such inbound tag: %s", err)
+		return fmt.Errorf("no such inbound tag: %w", err)
 	}
 	inboundInstance, ok := handler.(proxy.GetInbound)
 	if !ok {
@@ -85,7 +85,7 @@ func (c *Controller) addUsers(users []*protocol.User, tag string) error {
 func (c *Controller) removeUsers(users []string, tag string) error {
 	handler, err := c.ibm.GetHandler(context.Background(), tag)
 	if err != nil {
-		return fmt.Errorf("no such inbound tag: %s", err)
+		return fmt.Errorf("no such inbound tag: %w", err)
 	}
 	inboundInstance, ok := handler.(proxy.GetInbound)
 	if !ok {
@@ -94,7 +94,7 @@ func (c *Controller) removeUsers(users []string, tag string) error {
 
 	userManager, ok := inboundInstance.GetInbound().(proxy.UserManager)
 	if !ok {
-		return fmt.Errorf("handler %s is not implement proxy.UserManager", err)
+		return fmt.Errorf("handler is not implement proxy.UserManager %w", err)
 	}
 	for _, email := range users {
 		err = userManager.RemoveUser(context.Background(), email)
@@ -105,7 +105,7 @@ func (c *Controller) removeUsers(users []string, tag string) error {
 	return nil
 }
 
-func (c *Controller) getTraffic(email string) (up int64, down int64, upCounter stats.Counter, downCounter stats.Counter) {
+func (c *Controller) getTraffic(email string) (up, down int64, upCounter, downCounter stats.Counter) {
 	upName := "user>>>" + email + ">>>traffic>>>uplink"
 	downName := "user>>>" + email + ">>>traffic>>>downlink"
 	upCounter = c.stm.GetCounter(upName)
@@ -123,7 +123,7 @@ func (c *Controller) getTraffic(email string) (up int64, down int64, upCounter s
 	return up, down, upCounter, downCounter
 }
 
-func (c *Controller) resetTraffic(upCounterList *[]stats.Counter, downCounterList *[]stats.Counter) {
+func (*Controller) resetTraffic(upCounterList, downCounterList *[]stats.Counter) {
 	for _, upCounter := range *upCounterList {
 		upCounter.Set(0)
 	}
@@ -132,7 +132,11 @@ func (c *Controller) resetTraffic(upCounterList *[]stats.Counter, downCounterLis
 	}
 }
 
-func (c *Controller) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList *[]api.UserInfo, globalDeviceLimitConfig *limiter.GlobalDeviceLimitConfig) error {
+func (c *Controller) AddInboundLimiter(
+	tag string,
+	nodeSpeedLimit uint64,
+	userList *[]api.UserInfo,
+	globalDeviceLimitConfig *limiter.GlobalDeviceLimitConfig) error {
 	err := c.dispatcher.Limiter.AddInboundLimiter(tag, nodeSpeedLimit, userList, globalDeviceLimitConfig)
 	return err
 }

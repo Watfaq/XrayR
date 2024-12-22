@@ -2,6 +2,7 @@ package mydispatcher
 
 import (
 	"context"
+	"errors"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/net"
@@ -34,11 +35,11 @@ type Sniffer struct {
 func NewSniffer(ctx context.Context) *Sniffer {
 	ret := &Sniffer{
 		sniffer: []protocolSnifferWithMetadata{
-			{func(c context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b) }, false, net.Network_TCP},
-			{func(c context.Context, b []byte) (SniffResult, error) { return tls.SniffTLS(b) }, false, net.Network_TCP},
-			{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffBittorrent(b) }, false, net.Network_TCP},
-			{func(c context.Context, b []byte) (SniffResult, error) { return quic.SniffQUIC(b) }, false, net.Network_UDP},
-			{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffUTP(b) }, false, net.Network_UDP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b) }, false, net.Network_TCP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return tls.SniffTLS(b) }, false, net.Network_TCP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffBittorrent(b) }, false, net.Network_TCP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return quic.SniffQUIC(b) }, false, net.Network_UDP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffUTP(b) }, false, net.Network_UDP},
 		},
 	}
 	if sniffer, err := newFakeDNSSniffer(ctx); err == nil {
@@ -62,7 +63,7 @@ func (s *Sniffer) Sniff(c context.Context, payload []byte, network net.Network) 
 			continue
 		}
 		result, err := s(c, payload)
-		if err == common.ErrNoClue {
+		if errors.Is(err, common.ErrNoClue) {
 			pendingSniffer = append(pendingSniffer, si)
 			continue
 		}
@@ -89,7 +90,7 @@ func (s *Sniffer) SniffMetadata(c context.Context) (SniffResult, error) {
 			continue
 		}
 		result, err := s(c, nil)
-		if err == common.ErrNoClue {
+		if errors.Is(err, common.ErrNoClue) {
 			pendingSniffer = append(pendingSniffer, si)
 			continue
 		}
@@ -107,7 +108,7 @@ func (s *Sniffer) SniffMetadata(c context.Context) (SniffResult, error) {
 	return nil, errUnknownContent
 }
 
-func CompositeResult(domainResult SniffResult, protocolResult SniffResult) SniffResult {
+func CompositeResult(domainResult, protocolResult SniffResult) SniffResult {
 	return &compositeResult{domainResult: domainResult, protocolResult: protocolResult}
 }
 

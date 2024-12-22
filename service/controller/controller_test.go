@@ -31,14 +31,6 @@ func TestController(t *testing.T) {
 	serverConfig.Policy = policyConfig
 	config, _ := serverConfig.Build()
 
-	// config := &core.Config{
-	// 	App: []*serial.TypedMessage{
-	// 		serial.ToTypedMessage(&dispatcher.Config{}),
-	// 		serial.ToTypedMessage(&proxyman.InboundConfig{}),
-	// 		serial.ToTypedMessage(&proxyman.OutboundConfig{}),
-	// 		serial.ToTypedMessage(&stats.Config{}),
-	// 	}}
-
 	server, err := core.New(config)
 	if err != nil {
 		t.Errorf("failed to create instance: %s", err)
@@ -76,7 +68,7 @@ func TestController(t *testing.T) {
 
 	{
 		osSignals := make(chan os.Signal, 1)
-		signal.Notify(osSignals, os.Interrupt, os.Kill, syscall.SIGTERM)
+		signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 		<-osSignals
 	}
 }

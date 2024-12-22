@@ -80,7 +80,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			protocol = "vmess"
 			proxySetting = &conf.VMessInboundConfig{}
 		}
-	case "Trojan":
+	case api.NodeTypeTrojan:
 		protocol = "trojan"
 		// Enable fallback
 		if config.EnableFallback {
@@ -95,7 +95,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		} else {
 			proxySetting = &conf.TrojanServerConfig{}
 		}
-	case "Shadowsocks", "Shadowsocks-Plugin":
+	case api.NodeTypeShadowsocks, api.NodeTypeShadowsocksPlugin:
 		protocol = "shadowsocks"
 		cipher := strings.ToLower(nodeInfo.CypherMethod)
 
@@ -108,7 +108,10 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		// shadowsocks must have a random password
 		// shadowsocks2022's password == user PSK, thus should a length of string >= 32 and base64 encoder
 		b := make([]byte, 32)
-		rand.Read(b)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, fmt.Errorf("generate random password failed: %w", err)
+		}
 		randPasswd := hex.EncodeToString(b)
 		if C.Contains(shadowaead_2022.List, cipher) {
 			proxySetting.Users = append(proxySetting.Users, &conf.ShadowsocksUserConfig{
@@ -124,7 +127,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			proxySetting.IVCheck = false
 		}
 
-	case "dokodemo-door":
+	case api.NodeTypeDokodemo:
 		protocol = "dokodemo-door"
 		proxySetting = struct {
 			Host        string   `json:"address"`
@@ -139,7 +142,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 
 	setting, err := json.Marshal(proxySetting)
 	if err != nil {
-		return nil, fmt.Errorf("marshal proxy %s config failed: %s", nodeInfo.NodeType, err)
+		return nil, fmt.Errorf("marshal proxy %s config failed: %w", nodeInfo.NodeType, err)
 	}
 	inboundDetourConfig.Protocol = protocol
 	inboundDetourConfig.Settings = &setting
@@ -149,7 +152,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	transportProtocol := conf.TransportProtocol(nodeInfo.TransportProtocol)
 	networkType, err := transportProtocol.Build()
 	if err != nil {
-		return nil, fmt.Errorf("convert TransportProtocol failed: %s", err)
+		return nil, fmt.Errorf("convert TransportProtocol failed: %w", err)
 	}
 
 	switch networkType {
@@ -175,7 +178,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			Host:    &hosts,
 			Path:    nodeInfo.Path,
 			Method:  nodeInfo.Method,
-			Headers: nodeInfo.HttpHeaders,
+			Headers: nodeInfo.HTTPHeaders,
 		}
 		streamSetting.HTTPSettings = httpSettings
 	case "grpc":
@@ -270,7 +273,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	return inboundDetourConfig.Build()
 }
 
-func getCertFile(certConfig *mylego.CertConfig) (certFile string, keyFile string, err error) {
+func getCertFile(certConfig *mylego.CertConfig) (certFile, keyFile string, err error) {
 	switch certConfig.CertMode {
 	case "file":
 		if certConfig.CertFile == "" || certConfig.KeyFile == "" {
@@ -309,7 +312,6 @@ func buildVlessFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.VLessInboun
 
 	vlessFallBacks := make([]*conf.VLessInboundFallback, len(fallbackConfigs))
 	for i, c := range fallbackConfigs {
-
 		if c.Dest == "" {
 			return nil, fmt.Errorf("dest is required for fallback failed")
 		}
@@ -317,7 +319,7 @@ func buildVlessFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.VLessInboun
 		var dest json.RawMessage
 		dest, err := json.Marshal(c.Dest)
 		if err != nil {
-			return nil, fmt.Errorf("marshal dest %s config failed: %s", dest, err)
+			return nil, fmt.Errorf("marshal dest %s config failed: %w", dest, err)
 		}
 		vlessFallBacks[i] = &conf.VLessInboundFallback{
 			Name: c.SNI,
@@ -337,7 +339,6 @@ func buildTrojanFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.TrojanInbo
 
 	trojanFallBacks := make([]*conf.TrojanInboundFallback, len(fallbackConfigs))
 	for i, c := range fallbackConfigs {
-
 		if c.Dest == "" {
 			return nil, fmt.Errorf("dest is required for fallback failed")
 		}
@@ -345,7 +346,7 @@ func buildTrojanFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.TrojanInbo
 		var dest json.RawMessage
 		dest, err := json.Marshal(c.Dest)
 		if err != nil {
-			return nil, fmt.Errorf("marshal dest %s config failed: %s", dest, err)
+			return nil, fmt.Errorf("marshal dest %s config failed: %w", dest, err)
 		}
 		trojanFallBacks[i] = &conf.TrojanInboundFallback{
 			Name: c.SNI,

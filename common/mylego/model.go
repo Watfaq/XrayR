@@ -11,6 +11,12 @@ type CertConfig struct {
 	RejectUnknownSni bool              `mapstructure:"RejectUnknownSni"`
 }
 
+const (
+	CertModeHTTP = "http"
+	CertModeDNS  = "dns"
+	CertModeTLS  = "tls"
+)
+
 type LegoCMD struct {
 	C    *CertConfig
 	path string

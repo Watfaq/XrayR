@@ -105,7 +105,6 @@ func TestReportReportNodeOnlineUsers(t *testing.T) {
 			IP:  fmt.Sprintf("1.1.1.%d", i),
 		}
 	}
-	// client.Debug()
 	err = client.ReportNodeOnlineUsers(&onlineUserList)
 	if err != nil {
 		t.Error(err)
@@ -126,7 +125,6 @@ func TestReportReportUserTraffic(t *testing.T) {
 			Download: 114514,
 		}
 	}
-	// client.Debug()
 	err = client.ReportUserTraffic(&generalUserTraffic)
 	if err != nil {
 		t.Error(err)

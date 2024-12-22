@@ -1,6 +1,7 @@
 package mydispatcher
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/features/stats"
@@ -21,5 +22,8 @@ func (w *SizeStatWriter) Close() error {
 }
 
 func (w *SizeStatWriter) Interrupt() {
-	common.Interrupt(w.Writer)
+	err := common.Interrupt(w.Writer)
+	if err != nil {
+		logrus.Error(newError("failed to interrupt writer").Base(err))
+	}
 }

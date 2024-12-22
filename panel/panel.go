@@ -35,7 +35,7 @@ func New(panelConfig *Config) *Panel {
 	return p
 }
 
-func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
+func (*Panel) loadCore(panelConfig *Config) *core.Instance {
 	// Log Config
 	coreLogConfig := &conf.LogConfig{}
 	logConfig := getDefaultLogConfig()
@@ -49,13 +49,13 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	coreLogConfig.ErrorLog = logConfig.ErrorPath
 
 	// DNS config
-	coreDnsConfig := &conf.DNSConfig{}
-	if panelConfig.DnsConfigPath != "" {
-		if data, err := os.ReadFile(panelConfig.DnsConfigPath); err != nil {
-			log.Panicf("Failed to read DNS config file at: %s", panelConfig.DnsConfigPath)
+	coreDNSConfig := &conf.DNSConfig{}
+	if panelConfig.DNSConfigPath != "" {
+		if data, err := os.ReadFile(panelConfig.DNSConfigPath); err != nil {
+			log.Panicf("Failed to read DNS config file at: %s", panelConfig.DNSConfigPath)
 		} else {
-			if err = json.Unmarshal(data, coreDnsConfig); err != nil {
-				log.Panicf("Failed to unmarshal DNS config: %s", panelConfig.DnsConfigPath)
+			if err = json.Unmarshal(data, coreDNSConfig); err != nil {
+				log.Panicf("Failed to unmarshal DNS config: %s", panelConfig.DNSConfigPath)
 			}
 		}
 	}
@@ -65,7 +65,7 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	// 	config.ControllerConfig.DNSConfig = coreDnsConfig
 	// }
 
-	dnsConfig, err := coreDnsConfig.Build()
+	dnsConfig, err := coreDNSConfig.Build()
 	if err != nil {
 		log.Panicf("Failed to understand DNS config, Please check: https://xtls.github.io/config/dns.html for help: %s", err)
 	}
@@ -73,7 +73,8 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	// Routing config
 	coreRouterConfig := &conf.RouterConfig{}
 	if panelConfig.RouteConfigPath != "" {
-		if data, err := os.ReadFile(panelConfig.RouteConfigPath); err != nil {
+		var data []byte
+		if data, err = os.ReadFile(panelConfig.RouteConfigPath); err != nil {
 			log.Panicf("Failed to read Routing config file at: %s", panelConfig.RouteConfigPath)
 		} else {
 			if err = json.Unmarshal(data, coreRouterConfig); err != nil {
@@ -88,7 +89,8 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	// Custom Inbound config
 	var coreCustomInboundConfig []conf.InboundDetourConfig
 	if panelConfig.InboundConfigPath != "" {
-		if data, err := os.ReadFile(panelConfig.InboundConfigPath); err != nil {
+		var data []byte
+		if data, err = os.ReadFile(panelConfig.InboundConfigPath); err != nil {
 			log.Panicf("Failed to read Custom Inbound config file at: %s", panelConfig.OutboundConfigPath)
 		} else {
 			if err = json.Unmarshal(data, &coreCustomInboundConfig); err != nil {
@@ -98,7 +100,8 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	}
 	var inBoundConfig []*core.InboundHandlerConfig
 	for _, config := range coreCustomInboundConfig {
-		oc, err := config.Build()
+		var oc *core.InboundHandlerConfig
+		oc, err = config.Build()
 		if err != nil {
 			log.Panicf("Failed to understand Inbound config, Please check: https://xtls.github.io/config/inbound.html for help: %s", err)
 		}
@@ -107,7 +110,8 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	// Custom Outbound config
 	var coreCustomOutboundConfig []conf.OutboundDetourConfig
 	if panelConfig.OutboundConfigPath != "" {
-		if data, err := os.ReadFile(panelConfig.OutboundConfigPath); err != nil {
+		var data []byte
+		if data, err = os.ReadFile(panelConfig.OutboundConfigPath); err != nil {
 			log.Panicf("Failed to read Custom Outbound config file at: %s", panelConfig.OutboundConfigPath)
 		} else {
 			if err = json.Unmarshal(data, &coreCustomOutboundConfig); err != nil {
@@ -117,7 +121,8 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	}
 	var outBoundConfig []*core.OutboundHandlerConfig
 	for _, config := range coreCustomOutboundConfig {
-		oc, err := config.Build()
+		var oc *core.OutboundHandlerConfig
+		oc, err = config.Build()
 		if err != nil {
 			log.Panicf("Failed to understand Outbound config, Please check: https://xtls.github.io/config/outbound.html for help: %s", err)
 		}
@@ -169,7 +174,7 @@ func (p *Panel) Start() {
 		switch nodeConfig.PanelType {
 		case "SSpanel":
 		case "FAC":
-			apiClient = fac.New(nodeConfig.ApiConfig)
+			apiClient = fac.New(nodeConfig.APIConfig)
 		default:
 			log.Panicf("Unsupport panel type: %s", nodeConfig.PanelType)
 		}
@@ -183,7 +188,6 @@ func (p *Panel) Start() {
 		}
 		controllerService = controller.New(server, apiClient, controllerConfig, nodeConfig.PanelType)
 		p.Service = append(p.Service, controllerService)
-
 	}
 
 	// Start all the service
