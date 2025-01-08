@@ -87,7 +87,7 @@ func (c *Controller) Start() error {
 		return errors.New("server port must > 0")
 	}
 	c.nodeInfo = newNodeInfo
-	c.Tag = c.buildNodeTag()
+	c.Tag = newNodeInfo.Tag(c.config.ListenIP, c.nodeInfo.Port)
 
 	// Add new tag
 	err = c.addNewTag(newNodeInfo)
@@ -241,7 +241,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			}
 			// Add new tag
 			c.nodeInfo = newNodeInfo
-			c.Tag = c.buildNodeTag()
+			c.Tag = newNodeInfo.Tag(c.config.ListenIP, newNodeInfo.Port)
 			err = c.addNewTag(newNodeInfo)
 			if err != nil {
 				c.logger.Print(err)
@@ -353,9 +353,10 @@ func (c *Controller) addNewTag(newNodeInfo *api.NodeInfo) (err error) {
 }
 
 func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error) { //nolint:gocritic // ignore
-	// Shadowsocks-Plugin require a separate inbound for other TransportProtocol likes: ws, grpc
+	// Add a local Shadowsocks for obfs
 	fakeNodeInfo := newNodeInfo
 	fakeNodeInfo.TransportProtocol = api.TransportProtocolTCP
+	fakeNodeInfo.NodeType = api.NodeTypeShadowsocks
 	fakeNodeInfo.EnableTLS = false
 	// Add a regular Shadowsocks inbound and outbound
 	inboundConfig, err := InboundBuilder(c.config, &fakeNodeInfo, c.Tag)
@@ -374,24 +375,15 @@ func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error)
 	if err != nil {
 		return err
 	}
-	// Add an inbound for upper streaming protocol
+	// Add a public UDP inbound
 	fakeNodeInfo = newNodeInfo
-	fakeNodeInfo.Port++
-	fakeNodeInfo.NodeType = api.NodeTypeDokodemo
-	dokodemoTag := fmt.Sprintf("dokodemo-door_%s+1", c.Tag)
-	inboundConfig, err = InboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
+	fakeNodeInfo.NodeType = api.NodeTypeShadowsocksPlugin
+	tag := fakeNodeInfo.Tag(c.config.ListenIP, uint32(c.nodeInfo.AltPort))
+	inboundConfig, err = InboundBuilder(c.config, &fakeNodeInfo, tag)
 	if err != nil {
 		return err
 	}
 	err = c.addInbound(inboundConfig)
-	if err != nil {
-		return err
-	}
-	outBoundConfig, err = OutboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
-	if err != nil {
-		return err
-	}
-	err = c.addOutbound(outBoundConfig)
 	if err != nil {
 		return err
 	}
@@ -409,19 +401,24 @@ func (c *Controller) addNewUser(userInfo *[]api.UserInfo, nodeInfo *api.NodeInfo
 		}
 	case api.NodeTypeTrojan:
 		users = c.buildTrojanUser(userInfo)
-	case api.NodeTypeShadowsocks:
+	case api.NodeTypeShadowsocks, api.NodeTypeShadowsocksPlugin:
 		users = c.buildSSUser(userInfo, nodeInfo.CypherMethod)
-	case api.NodeTypeShadowsocksPlugin:
-		users = c.buildSSPluginUser(userInfo)
 	default:
 		return fmt.Errorf("unsupported node type: %s", nodeInfo.NodeType)
 	}
 
-	err = c.addUsers(users, c.Tag)
-	if err != nil {
-		return err
+	tags := []string{c.Tag}
+	if nodeInfo.NodeType == api.NodeTypeShadowsocksPlugin {
+		tags = append(tags, nodeInfo.Tag(c.config.ListenIP, uint32(nodeInfo.AltPort)))
 	}
-	c.logger.Printf("Added %d new users", len(*userInfo))
+	for _, tag := range tags {
+		err = c.addUsers(users, tag)
+		if err != nil {
+			return err
+		}
+		c.logger.Printf("Added %d new users for tag %s", len(*userInfo), tag)
+
+	}
 	return nil
 }
 
@@ -606,10 +603,6 @@ func (c *Controller) userInfoMonitor() (err error) {
 		}
 	}
 	return nil
-}
-
-func (c *Controller) buildNodeTag() string {
-	return fmt.Sprintf("%s_%s_%d", c.nodeInfo.NodeType, c.config.ListenIP, c.nodeInfo.Port)
 }
 
 // func (c *Controller) logPrefix() string {

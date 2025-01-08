@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 
 	"github.com/xtls/xray-core/infra/conf"
@@ -62,6 +63,7 @@ type NodeInfo struct {
 	NodeType            string // Must be V2ray, Trojan, and Shadowsocks
 	NodeID              string
 	Port                uint32
+	AltPort             uint16 // AltPort is used for Shadowsocks-Plugin
 	SpeedLimit          uint64 // Bps
 	AlterID             uint16
 	TransportProtocol   string
@@ -98,6 +100,11 @@ type NodeInfo struct {
 	Security            string
 	Key                 string
 	RejectUnknownSni    bool
+}
+
+func (n *NodeInfo) Tag(listenIP string, port uint32) string {
+	return fmt.Sprintf("%s_%s_%d", n.NodeType, listenIP, port)
+
 }
 
 type UserInfo struct {

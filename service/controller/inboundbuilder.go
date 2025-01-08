@@ -23,7 +23,7 @@ import (
 func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.InboundHandlerConfig, error) {
 	inboundDetourConfig := &conf.InboundDetourConfig{}
 	// Build Listen IP address
-	if nodeInfo.NodeType == "Shadowsocks-Plugin" {
+	if nodeInfo.NodeType == api.NodeTypeShadowsocks {
 		// Shdowsocks listen in 127.0.0.1 for safety
 		inboundDetourConfig.ListenOn = &conf.Address{Address: net.ParseAddress("127.0.0.1")}
 	} else if config.ListenIP != "" {
@@ -32,8 +32,12 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	}
 
 	// Build Port
+	port := nodeInfo.Port
+	if nodeInfo.NodeType == api.NodeTypeShadowsocksPlugin {
+		port = uint32(nodeInfo.AltPort)
+	}
 	portList := &conf.PortList{
-		Range: []conf.PortRange{{From: nodeInfo.Port, To: nodeInfo.Port}},
+		Range: []conf.PortRange{{From: port, To: port}},
 	}
 	inboundDetourConfig.PortList = portList
 	// Build Tag
@@ -57,8 +61,8 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	var proxySetting any
 	// Build Protocol and Protocol setting
 	switch nodeInfo.NodeType {
-	case "V2ray", "Vmess", "Vless":
-		if nodeInfo.EnableVless || (nodeInfo.NodeType == "Vless" && nodeInfo.NodeType != "Vmess") {
+	case api.NodeTypeV2ray, api.NodeTypeVLess, api.NodeTypeVMESS:
+		if nodeInfo.EnableVless || (nodeInfo.NodeType == api.NodeTypeVLess && nodeInfo.NodeType != api.NodeTypeVMESS) {
 			protocol = "vless"
 			// Enable fallback
 			if config.EnableFallback {
@@ -121,7 +125,11 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			proxySetting.Password = randPasswd
 		}
 
-		proxySetting.NetworkList = &conf.NetworkList{"tcp", "udp"}
+		if nodeInfo.NodeType == api.NodeTypeShadowsocks {
+			proxySetting.NetworkList = &conf.NetworkList{"tcp", "udp"}
+		} else {
+			proxySetting.NetworkList = &conf.NetworkList{"udp"}
+		}
 		proxySetting.IVCheck = true
 		if config.DisableIVCheck {
 			proxySetting.IVCheck = false
@@ -134,7 +142,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			NetworkList []string `json:"network"`
 		}{
 			Host:        "v1.mux.cool",
-			NetworkList: []string{"tcp", "udp"},
+			NetworkList: []string{"udp"},
 		}
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s, Only support: V2ray, Trojan, Shadowsocks, and Shadowsocks-Plugin", nodeInfo.NodeType)

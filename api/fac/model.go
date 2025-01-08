@@ -17,6 +17,7 @@ type NodeInfoResponse struct {
 
 type CustomConfig struct {
 	OffsetPortNode string          `json:"offset_port_node"`
+	AltPort        uint16          `json:"alt_port"`
 	Host           string          `json:"host"`
 	Method         string          `json:"method"`
 	TLS            string          `json:"tls"`
