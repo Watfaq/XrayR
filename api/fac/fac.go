@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,12 +18,6 @@ import (
 	"github.com/go-resty/resty/v2"
 
 	"github.com/XrayR-project/XrayR/api"
-)
-
-var (
-	firstPortRe  = regexp.MustCompile(`(?m)port=(?P<outport>\d+)#?`) // First Port
-	secondPortRe = regexp.MustCompile(`(?m)port=\d+#(\d+)`)          // Second Port
-	hostRe       = regexp.MustCompile(`(?m)host=([\w.]+)\|?`)        // Host
 )
 
 // APIClient create a api client to the panel.
@@ -188,42 +181,13 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 		return nil, fmt.Errorf("unmarshal %s failed: %w", reflect.TypeOf(nodeInfoResponse), err)
 	}
 
-	// determine ssPanel version, if disable custom config or version < 2021.11, then use old api
 	c.version = nodeInfoResponse.Version
-	var isExpired bool
-	if compareVersion(c.version, "2021.11") == -1 {
-		isExpired = true
-	}
 
-	if c.DisableCustomConfig || isExpired {
-		if isExpired {
-			log.Print("The panel version is expired, it is recommended to update immediately")
-		}
-
-		switch c.NodeType {
-		case "V2ray":
-			nodeInfo, err = c.ParseV2rayNodeResponse(nodeInfoResponse)
-		case "Trojan":
-			nodeInfo, err = c.ParseTrojanNodeResponse(nodeInfoResponse)
-		case "Shadowsocks":
-			nodeInfo, err = c.ParseSSNodeResponse(nodeInfoResponse)
-		case "Shadowsocks-Plugin":
-			nodeInfo, err = c.ParseSSPluginNodeResponse(nodeInfoResponse)
-		default:
-			return nil, fmt.Errorf("unsupported Node type: %s", c.NodeType)
-		}
-	} else {
-		nodeInfo, err = c.ParseSSPanelNodeInfo(nodeInfoResponse)
-		if err != nil {
-			res, _ := json.Marshal(nodeInfoResponse)
-			return nil, fmt.Errorf("parse node info failed: %s, \nError: %s, \nPlease check the doc of custom_config for help: "+
-				"https://xrayr-project.github.io/XrayR-doc/dui-jie-sspanel/sspanel/sspanel_custom_config", string(res), err)
-		}
-	}
-
+	nodeInfo, err = c.ParseSSPanelNodeInfo(nodeInfoResponse)
 	if err != nil {
 		res, _ := json.Marshal(nodeInfoResponse)
-		return nil, fmt.Errorf("parse node info failed: %s, \nError: %w", string(res), err)
+		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s, \nPlease check the doc of custom_config for help: "+
+			"https://xrayr-project.github.io/XrayR-doc/dui-jie-sspanel/sspanel/sspanel_custom_config", string(res), err)
 	}
 
 	return nodeInfo, nil
@@ -407,292 +371,6 @@ func (c *APIClient) ReportIllegal(detectResultList *[]api.DetectResult) error {
 	return nil
 }
 
-// ParseV2rayNodeResponse parse the response for the given node info format
-func (c *APIClient) ParseV2rayNodeResponse(nodeInfoResponse *NodeInfoResponse) (*api.NodeInfo, error) {
-	var enableTLS bool
-	var path, host, transportProtocol, serviceName, HeaderType string
-	var header json.RawMessage
-	var speedLimit uint64
-
-	if nodeInfoResponse.RawServerString == "" {
-		return nil, fmt.Errorf("no server info in response")
-	}
-	serverConf := strings.Split(nodeInfoResponse.RawServerString, ";")
-
-	parsedPort, err := strconv.ParseInt(serverConf[1], 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	if parsedPort < 0 || parsedPort > math.MaxUint32 {
-		return nil, fmt.Errorf("parsed port %d is out of range for uint32", parsedPort)
-	}
-	port := uint32(parsedPort)
-
-	parsedAlterID, err := strconv.ParseInt(serverConf[2], 10, 16)
-	if err != nil {
-		return nil, err
-	}
-	if parsedAlterID < 0 || parsedAlterID > math.MaxUint16 {
-		return nil, fmt.Errorf("parsed alterID %d is out of range for uint16", parsedAlterID)
-	}
-	alterID := uint16(parsedAlterID)
-
-	// Compatible with more node types config
-	for _, value := range serverConf[3:5] {
-		switch value {
-		case api.SecurityTypeTLS:
-			enableTLS = true
-		default:
-			if value != "" {
-				transportProtocol = value
-			}
-		}
-	}
-	extraServerConf := strings.Split(serverConf[5], "|")
-	serviceName = ""
-	for _, item := range extraServerConf {
-		conf := strings.Split(item, "=")
-		key := conf[0]
-		if key == "" {
-			continue
-		}
-		value := conf[1]
-		switch key {
-		case "path":
-			rawPath := strings.Join(conf[1:], "=") // In case of the path strings contains the "="
-			path = rawPath
-		case "host":
-			host = value
-		case "servicename":
-			serviceName = value
-		case "headerType":
-			HeaderType = value
-		}
-	}
-
-	if c.SpeedLimit > 0 {
-		speedLimit = uint64((c.SpeedLimit * 1000000) / 8)
-	} else {
-		speedLimit = uint64((nodeInfoResponse.SpeedLimit * 1000000) / 8)
-	}
-
-	if HeaderType != "" {
-		headers := map[string]string{"type": HeaderType}
-		header, err = json.Marshal(headers)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("marshal Header Type %s into config failed: %w", header, err)
-	}
-
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              port,
-		SpeedLimit:        speedLimit,
-		AlterID:           alterID,
-		TransportProtocol: transportProtocol,
-		EnableTLS:         enableTLS,
-		Path:              path,
-		Host:              host,
-		EnableVless:       c.EnableVless,
-		VlessFlow:         c.VlessFlow,
-		ServiceName:       serviceName,
-		Header:            header,
-	}
-
-	return nodeInfo, nil
-}
-
-// ParseSSNodeResponse parse the response for the given node info format
-func (c *APIClient) ParseSSNodeResponse(nodeInfoResponse *NodeInfoResponse) (*api.NodeInfo, error) {
-	var port uint32 = 0
-	var speedLimit uint64
-	var method string
-	path := "/mod_mu/users"
-	res, err := c.client.R().
-		SetQueryParam("node_id", c.NodeID).
-		SetResult(&Response{}).
-		ForceContentType("application/json").
-		Get(path)
-
-	response, err := c.parseResponse(res, path, err)
-	if err != nil {
-		return nil, err
-	}
-
-	userListResponse := new([]UserResponse)
-
-	if err := json.Unmarshal(response.Data, userListResponse); err != nil {
-		return nil, fmt.Errorf("unmarshal %s failed: %w", reflect.TypeOf(userListResponse), err)
-	}
-
-	// init server port
-	if len(*userListResponse) != 0 {
-		port = (*userListResponse)[0].Port
-	}
-
-	if c.SpeedLimit > 0 {
-		speedLimit = uint64((c.SpeedLimit * 1000000) / 8)
-	} else {
-		speedLimit = uint64((nodeInfoResponse.SpeedLimit * 1000000) / 8)
-	}
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              port,
-		SpeedLimit:        speedLimit,
-		TransportProtocol: "tcp",
-		CypherMethod:      method,
-	}
-
-	return nodeInfo, nil
-}
-
-// ParseSSPluginNodeResponse parse the response for the given node info format
-func (c *APIClient) ParseSSPluginNodeResponse(nodeInfoResponse *NodeInfoResponse) (*api.NodeInfo, error) {
-	var enableTLS bool
-	var path, host, transportProtocol string
-	var speedLimit uint64
-
-	serverConf := strings.Split(nodeInfoResponse.RawServerString, ";")
-	parsedPort, err := strconv.ParseInt(serverConf[1], 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	if parsedPort < 0 || parsedPort > math.MaxUint32 {
-		return nil, fmt.Errorf("parsed port %d is out of range for uint32", parsedPort)
-	}
-	port := uint32(parsedPort)
-	port-- // Shadowsocks-Plugin requires two ports, one for ss the other for other stream protocol
-	if port <= 0 {
-		return nil, fmt.Errorf("Shadowsocks-Plugin listen port must bigger than 1")
-	}
-	// Compatible with more node types config
-	for _, value := range serverConf[3:5] {
-		switch value {
-		case "tls":
-			enableTLS = true
-		case "ws":
-			transportProtocol = api.TransportProtocolWS
-		case "obfs":
-			transportProtocol = api.TransportProtocolTCP
-		}
-	}
-
-	extraServerConf := strings.Split(serverConf[5], "|")
-	for _, item := range extraServerConf {
-		conf := strings.Split(item, "=")
-		key := conf[0]
-		if key == "" {
-			continue
-		}
-		value := conf[1]
-		switch key {
-		case "path":
-			rawPath := strings.Join(conf[1:], "=") // In case of the path strings contains the "="
-			path = rawPath
-		case "host":
-			host = value
-		}
-	}
-	if c.SpeedLimit > 0 {
-		speedLimit = uint64((c.SpeedLimit * 1000000) / 8)
-	} else {
-		speedLimit = uint64((nodeInfoResponse.SpeedLimit * 1000000) / 8)
-	}
-
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              port,
-		SpeedLimit:        speedLimit,
-		TransportProtocol: transportProtocol,
-		EnableTLS:         enableTLS,
-		Path:              path,
-		Host:              host,
-	}
-
-	return nodeInfo, nil
-}
-
-// ParseTrojanNodeResponse parse the response for the given node info format
-func (c *APIClient) ParseTrojanNodeResponse(nodeInfoResponse *NodeInfoResponse) (*api.NodeInfo, error) {
-	// 域名或IP;port=连接端口#偏移端口|host=xx
-	// gz.aaa.com;port=443#12345|host=hk.aaa.com
-	var p, host, outsidePort, insidePort, transportProtocol, serviceName string
-	var speedLimit uint64
-
-	if nodeInfoResponse.RawServerString == "" {
-		return nil, fmt.Errorf("no server info in response")
-	}
-	if result := firstPortRe.FindStringSubmatch(nodeInfoResponse.RawServerString); len(result) > 1 {
-		outsidePort = result[1]
-	}
-	if result := secondPortRe.FindStringSubmatch(nodeInfoResponse.RawServerString); len(result) > 1 {
-		insidePort = result[1]
-	}
-	if result := hostRe.FindStringSubmatch(nodeInfoResponse.RawServerString); len(result) > 1 {
-		host = result[1]
-	}
-
-	if insidePort != "" {
-		p = insidePort
-	} else {
-		p = outsidePort
-	}
-
-	parsedPort, err := strconv.ParseInt(p, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	if parsedPort < 0 || parsedPort > math.MaxUint32 {
-		return nil, fmt.Errorf("parsed port %d is out of range for uint32", parsedPort)
-	}
-	port := uint32(parsedPort)
-
-	serverConf := strings.Split(nodeInfoResponse.RawServerString, ";")
-	extraServerConf := strings.Split(serverConf[1], "|")
-	transportProtocol = api.TransportProtocolTCP
-	serviceName = ""
-	for _, item := range extraServerConf {
-		conf := strings.Split(item, "=")
-		key := conf[0]
-		if key == "" {
-			continue
-		}
-		value := conf[1]
-		switch key {
-		case "grpc":
-			transportProtocol = api.TransportProtocolGRPC
-		case "servicename":
-			serviceName = value
-		}
-	}
-
-	if c.SpeedLimit > 0 {
-		speedLimit = uint64((c.SpeedLimit * 1000000) / 8)
-	} else {
-		speedLimit = uint64((nodeInfoResponse.SpeedLimit * 1000000) / 8)
-	}
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              port,
-		SpeedLimit:        speedLimit,
-		TransportProtocol: transportProtocol,
-		EnableTLS:         true,
-		Host:              host,
-		ServiceName:       serviceName,
-	}
-
-	return nodeInfo, nil
-}
-
 // ParseUserListResponse parse the response for the given node info format
 func (c *APIClient) ParseUserListResponse(userInfoResponse *[]UserResponse) (*[]api.UserInfo, error) {
 	c.access.Lock()
@@ -787,7 +465,7 @@ func (c *APIClient) ParseSSPanelNodeInfo(nodeInfoResponse *NodeInfoResponse) (*a
 	port := uint32(parsedPort)
 
 	switch c.NodeType {
-	case "Shadowsocks":
+	case api.NodeTypeShadowsocks, api.NodeTypeShadowsocksPlugin:
 		transportProtocol = "tcp"
 	case "V2ray":
 		transportProtocol = nodeConfig.Network
@@ -831,6 +509,7 @@ func (c *APIClient) ParseSSPanelNodeInfo(nodeInfoResponse *NodeInfoResponse) (*a
 		NodeType:          c.NodeType,
 		NodeID:            c.NodeID,
 		Port:              port,
+		AltPort:           nodeConfig.AltPort,
 		SpeedLimit:        speedLimit,
 		AlterID:           alterID,
 		TransportProtocol: transportProtocol,

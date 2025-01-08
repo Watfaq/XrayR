@@ -1,0 +1,30 @@
+Log:
+  Level: debug # Log level: none, error, warning, info, debug
+  AccessPath: access.log
+  ErrorPath: error.log
+# InboundConfigPath: custom_inbound.json
+ConnectionConfig:
+  Handshake: 4 # Handshake time limit, Second
+  ConnIdle: 10 # Connection idle time limit, Second
+  UplinkOnly: 2 # Time limit when the connection downstream is closed, Second
+  DownlinkOnly: 4 # Time limit when the connection is closed after the uplink is closed, Second
+  BufferSize: 64 # The internal cache size of each connection, kB
+Nodes:
+  - PanelType: "FAC"
+    ApiConfig:
+      ApiHost: http://localhost:3000
+      ApiKey: "ss123"
+      NodeID: test-node-westus-01.dev.slow-access.work
+      NodeType: Shadowsocks-Plugin # Node type: V2ray, Trojan, Shadowsocks, Shadowsocks-Plugin
+      Timeout: 30 # Timeout for the api request
+    ControllerConfig:
+      ListenIP: 0.0.0.0 # local listen address
+      SendIP: 0.0.0.0 # outbound interface ip
+      UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
+      EnableDNS: false # Use custom DNS config, Please ensure that you set the dns.json well
+      DNSType: AsIs # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
+      DisableUploadTraffic: false # Disable Upload Traffic to the panel
+      DisableGetRule: true # Disable Get Rule from the panel
+      DisableIVCheck: false # Disable the anti-reply protection for Shadowsocks
+      DisableSniffing: true # Disable domain sniffing
+      EnableProxyProtocol: false
