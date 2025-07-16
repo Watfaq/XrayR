@@ -47,6 +47,7 @@ type Config struct {
 	DeviceLimit         int     `mapstructure:"DeviceLimit"`
 	RuleListPath        string  `mapstructure:"RuleListPath"`
 	DisableCustomConfig bool    `mapstructure:"DisableCustomConfig"`
+	PrivateIP           string  `mapstructure:"PrivateIP"`
 }
 
 // NodeStatus Node status
