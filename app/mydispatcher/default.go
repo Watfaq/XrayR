@@ -165,17 +165,17 @@ func (*DefaultDispatcher) Close() error {
 	return nil
 }
 
-func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *transport.Link, error) {
+func (d *DefaultDispatcher) getLink(ctx context.Context) (inboundLink, outboundLink *transport.Link, err error) {
 	opt := pipe.OptionsFromContext(ctx)
 	uplinkReader, uplinkWriter := pipe.New(opt...)
 	downlinkReader, downlinkWriter := pipe.New(opt...)
 
-	inboundLink := &transport.Link{
+	inboundLink = &transport.Link{
 		Reader: downlinkReader,
 		Writer: uplinkWriter,
 	}
 
-	outboundLink := &transport.Link{
+	outboundLink = &transport.Link{
 		Reader: uplinkReader,
 		Writer: downlinkWriter,
 	}
@@ -193,7 +193,7 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			errors.LogWarning(ctx, "Devices reach the limit: ", user.Email)
 			common.Close(outboundLink.Writer)
 			common.Close(inboundLink.Writer)
-			err := common.Interrupt(outboundLink.Reader)
+			err = common.Interrupt(outboundLink.Reader)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -286,18 +286,18 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 	}
 
 	sniffingRequest := content.SniffingRequest
-	inbound, outbound, err := d.getLink(ctx)
+	inboundLink, outboundLink, err := d.getLink(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !sniffingRequest.Enabled {
-		go d.routedDispatch(ctx, outbound, destination)
+		go d.routedDispatch(ctx, outboundLink, destination)
 	} else {
 		go func() {
 			cReader := &cachedReader{
-				reader: outbound.Reader.(*pipe.Reader),
+				reader: outboundLink.Reader.(*pipe.Reader),
 			}
-			outbound.Reader = cReader
+			outboundLink.Reader = cReader
 			result, err := sniffer(ctx, cReader, sniffingRequest.MetadataOnly, destination.Network)
 			if err == nil {
 				content.Protocol = result.Protocol()
@@ -312,10 +312,10 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 					ob.Target = destination
 				}
 			}
-			d.routedDispatch(ctx, outbound, destination)
+			d.routedDispatch(ctx, outboundLink, destination)
 		}()
 	}
-	return inbound, nil
+	return inboundLink, nil
 }
 
 // DispatchLink implements routing.Dispatcher.

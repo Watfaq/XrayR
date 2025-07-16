@@ -6,7 +6,6 @@ toolchain go1.24.1
 
 require (
 	dario.cat/mergo v1.0.1
-	github.com/bitly/go-simplejson v0.5.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/eko/gocache/lib/v4 v4.1.6
 	github.com/eko/gocache/store/go_cache/v4 v4.2.2

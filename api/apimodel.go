@@ -104,7 +104,6 @@ type NodeInfo struct {
 
 func (n *NodeInfo) Tag(listenIP string, port uint32) string {
 	return fmt.Sprintf("%s_%s_%d", n.NodeType, listenIP, port)
-
 }
 
 type UserInfo struct {
