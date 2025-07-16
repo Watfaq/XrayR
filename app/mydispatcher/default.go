@@ -165,10 +165,7 @@ func (*DefaultDispatcher) Close() error {
 	return nil
 }
 
-func (d *DefaultDispatcher) getLink(
-	ctx context.Context,
-	_ net.Network,
-	_ session.SniffingRequest) (inboundLink, outboundLink *transport.Link, err error) {
+func (d *DefaultDispatcher) getLink(ctx context.Context) (inboundLink, outboundLink *transport.Link, err error) {
 	opt := pipe.OptionsFromContext(ctx)
 	uplinkReader, uplinkWriter := pipe.New(opt...)
 	downlinkReader, downlinkWriter := pipe.New(opt...)
@@ -289,7 +286,7 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 	}
 
 	sniffingRequest := content.SniffingRequest
-	inbound, outboundLink, err := d.getLink(ctx, destination.Network, sniffingRequest)
+	inboundLink, outboundLink, err := d.getLink(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +315,7 @@ func (d *DefaultDispatcher) Dispatch(ctx context.Context, destination net.Destin
 			d.routedDispatch(ctx, outboundLink, destination)
 		}()
 	}
-	return inbound, nil
+	return inboundLink, nil
 }
 
 // DispatchLink implements routing.Dispatcher.
