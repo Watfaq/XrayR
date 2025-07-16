@@ -50,7 +50,11 @@ func New() *Limiter {
 	}
 }
 
-func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList *[]api.UserInfo, globalLimit *GlobalDeviceLimitConfig) error {
+func (l *Limiter) AddInboundLimiter(
+	tag string,
+	nodeSpeedLimit uint64,
+	userList *[]api.UserInfo,
+	globalLimit *GlobalDeviceLimitConfig) error {
 	inboundInfo := &InboundInfo{
 		Tag:            tag,
 		NodeSpeedLimit: nodeSpeedLimit,
@@ -135,17 +139,17 @@ func (l *Limiter) GetOnlineDevice(tag string) (*[]api.OnlineUser, error) {
 	if value, ok := l.InboundInfo.Load(tag); ok {
 		inboundInfo := value.(*InboundInfo)
 		// Clear Speed Limiter bucket for users who are not online
-		inboundInfo.BucketHub.Range(func(key, value interface{}) bool {
+		inboundInfo.BucketHub.Range(func(key, _ any) bool {
 			email := key.(string)
 			if _, exists := inboundInfo.UserOnlineIP.Load(email); !exists {
 				inboundInfo.BucketHub.Delete(email)
 			}
 			return true
 		})
-		inboundInfo.UserOnlineIP.Range(func(key, value interface{}) bool {
+		inboundInfo.UserOnlineIP.Range(func(key, value any) bool {
 			email := key.(string)
 			ipMap := value.(*sync.Map)
-			ipMap.Range(func(key, value interface{}) bool {
+			ipMap.Range(func(key, value any) bool {
 				uid := value.(int)
 				ip := key.(string)
 				onlineUser = append(onlineUser, api.OnlineUser{UID: uid, IP: ip})
@@ -161,7 +165,7 @@ func (l *Limiter) GetOnlineDevice(tag string) (*[]api.OnlineUser, error) {
 	return &onlineUser, nil
 }
 
-func (l *Limiter) GetUserBucket(tag string, email string, ip string) (limiter *rate.Limiter, SpeedLimit bool, Reject bool) {
+func (l *Limiter) GetUserBucket(tag, email, ip string) (limiter *rate.Limiter, speedLimit, reject bool) {
 	if value, ok := l.InboundInfo.Load(tag); ok {
 		var (
 			userLimit        uint64 = 0
@@ -187,7 +191,7 @@ func (l *Limiter) GetUserBucket(tag string, email string, ip string) (limiter *r
 			// If this is a new ip
 			if _, ok := ipMap.LoadOrStore(ip, uid); !ok {
 				counter := 0
-				ipMap.Range(func(key, value interface{}) bool {
+				ipMap.Range(func(_, _ any) bool {
 					counter++
 					return true
 				})
@@ -208,25 +212,21 @@ func (l *Limiter) GetUserBucket(tag string, email string, ip string) (limiter *r
 		// Speed limit
 		limit := determineRate(nodeLimit, userLimit) // Determine the speed limit rate
 		if limit > 0 {
-			limiter := rate.NewLimiter(rate.Limit(limit), int(limit)) // Byte/s
+			limiter := rate.NewLimiter(rate.Limit(limit), int(limit)) //nolint:gosec // Limit is not from user input
 			if v, ok := inboundInfo.BucketHub.LoadOrStore(email, limiter); ok {
 				bucket := v.(*rate.Limiter)
 				return bucket, true, false
-			} else {
-				return limiter, true, false
 			}
-		} else {
-			return nil, false, false
+			return limiter, true, false
 		}
-	} else {
-		errors.LogDebug(context.Background(), "Get Inbound Limiter information failed")
 		return nil, false, false
 	}
+	errors.LogDebug(context.Background(), "Get Inbound Limiter information failed")
+	return nil, false, false
 }
 
 // Global device limit
 func globalLimit(inboundInfo *InboundInfo, email string, uid int, ip string, deviceLimit int) bool {
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(inboundInfo.GlobalLimit.config.Timeout)*time.Second)
 	defer cancel()
 
@@ -237,22 +237,22 @@ func globalLimit(inboundInfo *InboundInfo, email string, uid int, ip string, dev
 	if err != nil {
 		if _, ok := err.(*store.NotFound); ok {
 			// If the email is a new device
-			go pushIP(inboundInfo, uniqueKey, &map[string]int{ip: uid})
+			go pushIP(inboundInfo, uniqueKey, map[string]int{ip: uid})
 		} else {
 			errors.LogErrorInner(context.Background(), err, "cache service")
 		}
 		return false
 	}
 
-	ipMap := v.(*map[string]int)
+	ipMap := v.(map[string]int)
 	// Reject device reach limit directly
-	if deviceLimit > 0 && len(*ipMap) > deviceLimit {
+	if deviceLimit > 0 && len(ipMap) > deviceLimit {
 		return true
 	}
 
 	// If the ip is not in cache
-	if _, ok := (*ipMap)[ip]; !ok {
-		(*ipMap)[ip] = uid
+	if _, ok := (ipMap)[ip]; !ok {
+		(ipMap)[ip] = uid
 		go pushIP(inboundInfo, uniqueKey, ipMap)
 	}
 
@@ -260,7 +260,7 @@ func globalLimit(inboundInfo *InboundInfo, email string, uid int, ip string, dev
 }
 
 // push the ip to cache
-func pushIP(inboundInfo *InboundInfo, uniqueKey string, ipMap *map[string]int) {
+func pushIP(inboundInfo *InboundInfo, uniqueKey string, ipMap map[string]int) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(inboundInfo.GlobalLimit.config.Timeout)*time.Second)
 	defer cancel()
 
@@ -276,16 +276,11 @@ func determineRate(nodeLimit, userLimit uint64) (limit uint64) {
 			return nodeLimit
 		} else if nodeLimit < userLimit {
 			return userLimit
-		} else {
-			return 0
 		}
-	} else {
-		if nodeLimit > userLimit {
-			return userLimit
-		} else if nodeLimit < userLimit {
-			return nodeLimit
-		} else {
-			return nodeLimit
-		}
+		return 0
 	}
+	if nodeLimit > userLimit {
+		return userLimit
+	}
+	return nodeLimit
 }

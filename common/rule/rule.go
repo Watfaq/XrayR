@@ -49,14 +49,14 @@ func (r *Manager) GetDetectResult(tag string) (*[]api.DetectResult, error) {
 	return &detectResult, nil
 }
 
-func (r *Manager) Detect(tag string, destination string, email string) (reject bool) {
+func (r *Manager) Detect(tag, destination, email string) (reject bool) {
 	reject = false
 	var hitRuleID = -1
 	// If we have some rule for this inbound
 	if value, ok := r.InboundRule.Load(tag); ok {
 		ruleList := value.([]api.DetectRule)
 		for _, r := range ruleList {
-			if r.Pattern.Match([]byte(destination)) {
+			if r.Pattern.MatchString(destination) {
 				hitRuleID = r.ID
 				reject = true
 				break

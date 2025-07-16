@@ -90,7 +90,7 @@ func (c *Controller) buildSSUser(userInfo *[]api.UserInfo, method string) (users
 				Level: 0,
 				Email: e,
 				Account: serial.ToTypedMessage(&shadowsocks_2022.Account{
-					Key:   userKey,
+					Key: userKey,
 				}),
 			}
 		} else {
@@ -101,43 +101,6 @@ func (c *Controller) buildSSUser(userInfo *[]api.UserInfo, method string) (users
 					Password:   user.Passwd,
 					CipherType: cipherFromString(method),
 				}),
-			}
-		}
-	}
-	return users
-}
-
-func (c *Controller) buildSSPluginUser(userInfo *[]api.UserInfo) (users []*protocol.User) {
-	users = make([]*protocol.User, len(*userInfo))
-
-	for i, user := range *userInfo {
-		// shadowsocks2022 Key = openssl rand -base64 32 and multi users needn't cipher method
-		if C.Contains(shadowaead_2022.List, strings.ToLower(user.Method)) {
-			e := c.buildUserTag(&user)
-			userKey, err := c.checkShadowsocksPassword(user.Passwd, user.Method)
-			if err != nil {
-				errors.LogError(context.Background(), "[UID: %d] %s", user.UID, err)
-				continue
-			}
-			users[i] = &protocol.User{
-				Level: 0,
-				Email: e,
-				Account: serial.ToTypedMessage(&shadowsocks_2022.Account{
-					Key:   userKey,
-				}),
-			}
-		} else {
-			// Check if the cypher method is AEAD
-			cypherMethod := cipherFromString(user.Method)
-			if _, ok := AEADMethod[cypherMethod]; ok {
-				users[i] = &protocol.User{
-					Level: 0,
-					Email: c.buildUserTag(&user),
-					Account: serial.ToTypedMessage(&shadowsocks.Account{
-						Password:   user.Passwd,
-						CipherType: cypherMethod,
-					}),
-				}
 			}
 		}
 	}
@@ -163,7 +126,7 @@ func (c *Controller) buildUserTag(user *api.UserInfo) string {
 	return fmt.Sprintf("%s|%s|%d", c.Tag, user.Email, user.UID)
 }
 
-func (c *Controller) checkShadowsocksPassword(password string, method string) (string, error) {
+func (c *Controller) checkShadowsocksPassword(password, method string) (string, error) {
 	if strings.Contains(c.panelType, "V2board") {
 		var userKey string
 		if len(password) < 16 {
@@ -178,7 +141,6 @@ func (c *Controller) checkShadowsocksPassword(password string, method string) (s
 			userKey = password[:32]
 		}
 		return base64.StdEncoding.EncodeToString([]byte(userKey)), nil
-	} else {
-		return password, nil
 	}
+	return password, nil
 }

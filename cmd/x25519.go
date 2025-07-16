@@ -15,7 +15,7 @@ var (
 	x25519Cmd = &cobra.Command{
 		Use:   "x25519",
 		Short: "Generate key pair for x25519 key exchange",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if err := x25519(); err != nil {
 				fmt.Println(err)
 			}

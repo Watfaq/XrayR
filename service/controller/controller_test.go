@@ -12,7 +12,7 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 
 	"github.com/XrayR-project/XrayR/api"
-	"github.com/XrayR-project/XrayR/api/sspanel"
+	"github.com/XrayR-project/XrayR/api/fac"
 	_ "github.com/XrayR-project/XrayR/cmd/distro/all"
 	"github.com/XrayR-project/XrayR/common/mylego"
 	. "github.com/XrayR-project/XrayR/service/controller"
@@ -31,19 +31,12 @@ func TestController(t *testing.T) {
 	serverConfig.Policy = policyConfig
 	config, _ := serverConfig.Build()
 
-	// config := &core.Config{
-	// 	App: []*serial.TypedMessage{
-	// 		serial.ToTypedMessage(&dispatcher.Config{}),
-	// 		serial.ToTypedMessage(&proxyman.InboundConfig{}),
-	// 		serial.ToTypedMessage(&proxyman.OutboundConfig{}),
-	// 		serial.ToTypedMessage(&stats.Config{}),
-	// 	}}
-
 	server, err := core.New(config)
-	defer server.Close()
 	if err != nil {
 		t.Errorf("failed to create instance: %s", err)
+		return
 	}
+	defer server.Close()
 	if err = server.Start(); err != nil {
 		t.Errorf("Failed to start instance: %s", err)
 	}
@@ -60,10 +53,10 @@ func TestController(t *testing.T) {
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
 		Key:      "123",
-		NodeID:   41,
+		NodeID:   "41",
 		NodeType: "V2ray",
 	}
-	apiClient := sspanel.New(apiConfig)
+	apiClient := fac.New(apiConfig)
 	c := New(server, apiClient, controlerConfig, "SSpanel")
 	fmt.Println("Sleep 1s")
 	err = c.Start()
@@ -75,7 +68,7 @@ func TestController(t *testing.T) {
 
 	{
 		osSignals := make(chan os.Signal, 1)
-		signal.Notify(osSignals, os.Interrupt, os.Kill, syscall.SIGTERM)
+		signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 		<-osSignals
 	}
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 
 	"github.com/xtls/xray-core/infra/conf"
@@ -13,10 +14,30 @@ const (
 	RuleNotModified = "rules not modified"
 )
 
+const (
+	TransportProtocolTCP  = "tcp"
+	TransportProtocolWS   = "ws"
+	TransportProtocolGRPC = "grpc"
+)
+
+const (
+	NodeTypeV2ray             = "V2ray"
+	NodeTypeTrojan            = "Trojan"
+	NodeTypeShadowsocks       = "Shadowsocks"
+	NodeTypeShadowsocksPlugin = "Shadowsocks-Plugin"
+	NodeTypeVLess             = "Vless"
+	NodeTypeVMESS             = "Vmess"
+	NodeTypeDokodemo          = "dokodemo-door"
+)
+
+const (
+	SecurityTypeTLS = "tls"
+)
+
 // Config API config
 type Config struct {
 	APIHost             string  `mapstructure:"ApiHost"`
-	NodeID              int     `mapstructure:"NodeID"`
+	NodeID              string  `mapstructure:"NodeID"`
 	Key                 string  `mapstructure:"ApiKey"`
 	NodeType            string  `mapstructure:"NodeType"`
 	EnableVless         bool    `mapstructure:"EnableVless"`
@@ -40,8 +61,9 @@ type NodeInfo struct {
 	AcceptProxyProtocol bool
 	Authority           string
 	NodeType            string // Must be V2ray, Trojan, and Shadowsocks
-	NodeID              int
+	NodeID              string
 	Port                uint32
+	AltPort             uint16 // AltPort is used for Shadowsocks-Plugin
 	SpeedLimit          uint64 // Bps
 	AlterID             uint16
 	TransportProtocol   string
@@ -58,7 +80,7 @@ type NodeInfo struct {
 	ServiceName         string
 	Method              string
 	Header              json.RawMessage
-	HttpHeaders         map[string]*conf.StringList
+	HTTPHeaders         map[string]*conf.StringList
 	Headers             map[string]string
 	NameServerConfig    []*conf.NameServerConfig
 	EnableREALITY       bool
@@ -78,6 +100,11 @@ type NodeInfo struct {
 	Security            string
 	Key                 string
 	RejectUnknownSni    bool
+}
+
+func (n *NodeInfo) Tag(listenIP string, port uint32) string {
+	return fmt.Sprintf("%s_%s_%d", n.NodeType, listenIP, port)
+
 }
 
 type UserInfo struct {
@@ -106,7 +133,7 @@ type UserTraffic struct {
 
 type ClientInfo struct {
 	APIHost  string
-	NodeID   int
+	NodeID   string
 	Key      string
 	NodeType string
 }

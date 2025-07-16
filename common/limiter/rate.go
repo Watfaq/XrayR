@@ -2,7 +2,6 @@ package limiter
 
 import (
 	"context"
-	"io"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
@@ -12,10 +11,9 @@ import (
 type Writer struct {
 	writer  buf.Writer
 	limiter *rate.Limiter
-	w       io.Writer
 }
 
-func (l *Limiter) RateWriter(writer buf.Writer, limiter *rate.Limiter) buf.Writer {
+func (*Limiter) RateWriter(writer buf.Writer, limiter *rate.Limiter) buf.Writer {
 	return &Writer{
 		writer:  writer,
 		limiter: limiter,
@@ -28,6 +26,9 @@ func (w *Writer) Close() error {
 
 func (w *Writer) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	ctx := context.Background()
-	w.limiter.WaitN(ctx, int(mb.Len()))
+	err := w.limiter.WaitN(ctx, int(mb.Len()))
+	if err != nil {
+		return err
+	}
 	return w.writer.WriteMultiBuffer(mb)
 }

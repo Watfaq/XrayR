@@ -1,4 +1,4 @@
-package sspanel
+package fac
 
 import "encoding/json"
 
@@ -17,6 +17,7 @@ type NodeInfoResponse struct {
 
 type CustomConfig struct {
 	OffsetPortNode string          `json:"offset_port_node"`
+	AltPort        uint16          `json:"alt_port"`
 	Host           string          `json:"host"`
 	Method         string          `json:"method"`
 	TLS            string          `json:"tls"`
@@ -33,12 +34,14 @@ type CustomConfig struct {
 	Flow           string          `json:"flow"`
 	EnableREALITY  bool            `json:"enable_reality"`
 	RealityOpts    *REALITYConfig  `json:"reality-opts"`
+	ServerKey      string          `json:"server_key"`
 }
 
 // UserResponse is the response of user
 type UserResponse struct {
 	ID          int     `json:"id"`
 	Passwd      string  `json:"passwd"`
+	Email       string  `json:"email"`
 	Port        uint32  `json:"port"`
 	Method      string  `json:"method"`
 	SpeedLimit  float64 `json:"node_speedlimit"`
@@ -55,7 +58,7 @@ type Response struct {
 
 // PostData is the data structure of post data
 type PostData struct {
-	Data interface{} `json:"data"`
+	Data any `json:"data"`
 }
 
 // SystemLoad is the data structure of system load

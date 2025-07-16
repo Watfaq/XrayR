@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	version  = "0.9.5"
+	version  = "1.0.5"
 	codename = "XrayR"
 	intro    = "A Xray backend that supports many panels"
 )
@@ -16,7 +16,7 @@ func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print current version of XrayR",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			showVersion()
 		},
 	})

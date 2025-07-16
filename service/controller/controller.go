@@ -53,16 +53,16 @@ type periodicTask struct {
 }
 
 // New return a Controller service with default parameters.
-func New(server *core.Instance, api api.API, config *Config, panelType string) *Controller {
+func New(server *core.Instance, apiClient api.API, config *Config, panelType string) *Controller {
 	logger := log.NewEntry(log.StandardLogger()).WithFields(log.Fields{
-		"Host": api.Describe().APIHost,
-		"Type": api.Describe().NodeType,
-		"ID":   api.Describe().NodeID,
+		"Host": apiClient.Describe().APIHost,
+		"Type": apiClient.Describe().NodeType,
+		"ID":   apiClient.Describe().NodeID,
 	})
 	controller := &Controller{
 		server:     server,
 		config:     config,
-		apiClient:  api,
+		apiClient:  apiClient,
 		panelType:  panelType,
 		ibm:        server.GetFeature(inbound.ManagerType()).(inbound.Manager),
 		obm:        server.GetFeature(outbound.ManagerType()).(outbound.Manager),
@@ -87,7 +87,7 @@ func (c *Controller) Start() error {
 		return errors.New("server port must > 0")
 	}
 	c.nodeInfo = newNodeInfo
-	c.Tag = c.buildNodeTag()
+	c.Tag = newNodeInfo.Tag(c.config.ListenIP, c.nodeInfo.Port)
 
 	// Add new tag
 	err = c.addNewTag(newNodeInfo)
@@ -151,7 +151,7 @@ func (c *Controller) Start() error {
 	)
 
 	// Check cert service in need
-	if c.nodeInfo.EnableTLS && c.config.EnableREALITY == false {
+	if c.nodeInfo.EnableTLS && !c.config.EnableREALITY {
 		c.tasks = append(c.tasks, periodicTask{
 			tag: "cert monitor",
 			Periodic: &task.Periodic{
@@ -163,7 +163,11 @@ func (c *Controller) Start() error {
 	// Start periodic tasks
 	for i := range c.tasks {
 		c.logger.Printf("Start %s periodic task", c.tasks[i].tag)
-		go c.tasks[i].Start()
+		go func(task periodicTask) {
+			if err := task.Start(); err != nil {
+				c.logger.Printf("Error starting %s periodic task: %v", task.tag, err)
+			}
+		}(c.tasks[i])
 	}
 
 	return nil
@@ -209,6 +213,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 	newUserInfo, err := c.apiClient.GetUserList()
 	if err != nil {
 		if err.Error() == api.UserNotModified {
+			c.logger.Println("User list not modified")
 			usersChanged = false
 			newUserInfo = c.userList
 		} else {
@@ -222,12 +227,12 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 		if !reflect.DeepEqual(c.nodeInfo, newNodeInfo) {
 			// Remove old tag
 			oldTag := c.Tag
-			err := c.removeOldTag(oldTag)
+			err = c.removeOldTag(oldTag)
 			if err != nil {
 				c.logger.Print(err)
 				return nil
 			}
-			if c.nodeInfo.NodeType == "Shadowsocks-Plugin" {
+			if c.nodeInfo.NodeType == api.NodeTypeShadowsocksPlugin {
 				err = c.removeOldTag(fmt.Sprintf("dokodemo-door_%s+1", c.Tag))
 			}
 			if err != nil {
@@ -236,7 +241,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			}
 			// Add new tag
 			c.nodeInfo = newNodeInfo
-			c.Tag = c.buildNodeTag()
+			c.Tag = newNodeInfo.Tag(c.config.ListenIP, newNodeInfo.Port)
 			err = c.addNewTag(newNodeInfo)
 			if err != nil {
 				c.logger.Print(err)
@@ -255,12 +260,13 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 
 	// Check Rule
 	if !c.config.DisableGetRule {
-		if ruleList, err := c.apiClient.GetNodeRule(); err != nil {
+		var ruleList *[]api.DetectRule
+		if ruleList, err = c.apiClient.GetNodeRule(); err != nil {
 			if err.Error() != api.RuleNotModified {
 				c.logger.Printf("Get rule list filed: %s", err)
 			}
 		} else if len(*ruleList) > 0 {
-			if err := c.UpdateRule(c.Tag, *ruleList); err != nil {
+			if err = c.UpdateRule(c.Tag, *ruleList); err != nil {
 				c.logger.Print(err)
 			}
 		}
@@ -274,21 +280,21 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 		}
 
 		// Add Limiter
-		if err := c.AddInboundLimiter(c.Tag, newNodeInfo.SpeedLimit, newUserInfo, c.config.GlobalDeviceLimitConfig); err != nil {
+		if err = c.AddInboundLimiter(c.Tag, newNodeInfo.SpeedLimit, newUserInfo, c.config.GlobalDeviceLimitConfig); err != nil {
 			c.logger.Print(err)
 			return nil
 		}
-
 	} else {
 		var deleted, added []api.UserInfo
 		if usersChanged {
+			c.logger.Println("User list changed")
 			deleted, added = compareUserList(c.userList, newUserInfo)
 			if len(deleted) > 0 {
 				deletedEmail := make([]string, len(deleted))
 				for i, u := range deleted {
 					deletedEmail[i] = fmt.Sprintf("%s|%s|%d", c.Tag, u.Email, u.UID)
 				}
-				err := c.removeUsers(deletedEmail, c.Tag)
+				err = c.removeUsers(deletedEmail, c.Tag)
 				if err != nil {
 					c.logger.Print(err)
 				}
@@ -323,37 +329,34 @@ func (c *Controller) removeOldTag(oldTag string) (err error) {
 }
 
 func (c *Controller) addNewTag(newNodeInfo *api.NodeInfo) (err error) {
-	if newNodeInfo.NodeType != "Shadowsocks-Plugin" {
+	if newNodeInfo.NodeType != api.NodeTypeShadowsocksPlugin {
 		inboundConfig, err := InboundBuilder(c.config, newNodeInfo, c.Tag)
 		if err != nil {
 			return err
 		}
 		err = c.addInbound(inboundConfig)
 		if err != nil {
-
 			return err
 		}
 		outBoundConfig, err := OutboundBuilder(c.config, newNodeInfo, c.Tag)
 		if err != nil {
-
 			return err
 		}
 		err = c.addOutbound(outBoundConfig)
 		if err != nil {
-
 			return err
 		}
-
 	} else {
 		return c.addInboundForSSPlugin(*newNodeInfo)
 	}
 	return nil
 }
 
-func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error) {
-	// Shadowsocks-Plugin require a separate inbound for other TransportProtocol likes: ws, grpc
+func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error) { //nolint:gocritic // ignore
+	// Add a local Shadowsocks for obfs
 	fakeNodeInfo := newNodeInfo
-	fakeNodeInfo.TransportProtocol = "tcp"
+	fakeNodeInfo.TransportProtocol = api.TransportProtocolTCP
+	fakeNodeInfo.NodeType = api.NodeTypeShadowsocks
 	fakeNodeInfo.EnableTLS = false
 	// Add a regular Shadowsocks inbound and outbound
 	inboundConfig, err := InboundBuilder(c.config, &fakeNodeInfo, c.Tag)
@@ -362,74 +365,64 @@ func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error)
 	}
 	err = c.addInbound(inboundConfig)
 	if err != nil {
-
 		return err
 	}
 	outBoundConfig, err := OutboundBuilder(c.config, &fakeNodeInfo, c.Tag)
 	if err != nil {
-
 		return err
 	}
 	err = c.addOutbound(outBoundConfig)
 	if err != nil {
-
 		return err
 	}
-	// Add an inbound for upper streaming protocol
+	// Add a public UDP inbound
 	fakeNodeInfo = newNodeInfo
-	fakeNodeInfo.Port++
-	fakeNodeInfo.NodeType = "dokodemo-door"
-	dokodemoTag := fmt.Sprintf("dokodemo-door_%s+1", c.Tag)
-	inboundConfig, err = InboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
+	fakeNodeInfo.NodeType = api.NodeTypeShadowsocksPlugin
+	tag := fakeNodeInfo.Tag(c.config.ListenIP, uint32(c.nodeInfo.AltPort))
+	inboundConfig, err = InboundBuilder(c.config, &fakeNodeInfo, tag)
 	if err != nil {
 		return err
 	}
 	err = c.addInbound(inboundConfig)
 	if err != nil {
-
-		return err
-	}
-	outBoundConfig, err = OutboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
-	if err != nil {
-
-		return err
-	}
-	err = c.addOutbound(outBoundConfig)
-	if err != nil {
-
 		return err
 	}
 	return nil
 }
 
 func (c *Controller) addNewUser(userInfo *[]api.UserInfo, nodeInfo *api.NodeInfo) (err error) {
-	users := make([]*protocol.User, 0)
+	var users []*protocol.User
 	switch nodeInfo.NodeType {
-	case "V2ray", "Vmess", "Vless":
-		if nodeInfo.EnableVless || (nodeInfo.NodeType == "Vless" && nodeInfo.NodeType != "Vmess") {
+	case api.NodeTypeV2ray, api.NodeTypeVMESS, api.NodeTypeVLess:
+		if nodeInfo.EnableVless || (nodeInfo.NodeType == api.NodeTypeVLess && nodeInfo.NodeType != api.NodeTypeVMESS) {
 			users = c.buildVlessUser(userInfo)
 		} else {
 			users = c.buildVmessUser(userInfo)
 		}
-	case "Trojan":
+	case api.NodeTypeTrojan:
 		users = c.buildTrojanUser(userInfo)
-	case "Shadowsocks":
+	case api.NodeTypeShadowsocks, api.NodeTypeShadowsocksPlugin:
 		users = c.buildSSUser(userInfo, nodeInfo.CypherMethod)
-	case "Shadowsocks-Plugin":
-		users = c.buildSSPluginUser(userInfo)
 	default:
 		return fmt.Errorf("unsupported node type: %s", nodeInfo.NodeType)
 	}
 
-	err = c.addUsers(users, c.Tag)
-	if err != nil {
-		return err
+	tags := []string{c.Tag}
+	if nodeInfo.NodeType == api.NodeTypeShadowsocksPlugin {
+		tags = append(tags, nodeInfo.Tag(c.config.ListenIP, uint32(nodeInfo.AltPort)))
 	}
-	c.logger.Printf("Added %d new users", len(*userInfo))
+	for _, tag := range tags {
+		err = c.addUsers(users, tag)
+		if err != nil {
+			return err
+		}
+		c.logger.Printf("Added %d new users for tag %s", len(*userInfo), tag)
+
+	}
 	return nil
 }
 
-func compareUserList(old, new *[]api.UserInfo) (deleted, added []api.UserInfo) {
+func compareUserList(old, new *[]api.UserInfo) (deleted, added []api.UserInfo) { //nolint:gocritic // ignore
 	mSrc := make(map[api.UserInfo]byte) // 按源数组建索引
 	mAll := make(map[api.UserInfo]byte) // 源+目所有元素建索引
 
@@ -445,7 +438,7 @@ func compareUserList(old, new *[]api.UserInfo) (deleted, added []api.UserInfo) {
 		l := len(mAll)
 		mAll[v] = 1
 		if l != len(mAll) { // 长度变化，即可以存
-			l = len(mAll)
+			l = len(mAll) //nolint: ineffassign,staticcheck // ignore
 		} else { // 存不了，进并集
 			set = append(set, v)
 		}
@@ -467,14 +460,17 @@ func compareUserList(old, new *[]api.UserInfo) (deleted, added []api.UserInfo) {
 	return deleted, added
 }
 
-func limitUser(c *Controller, user api.UserInfo, silentUsers *[]api.UserInfo) {
+func limitUser(c *Controller, user api.UserInfo, silentUsers *[]api.UserInfo) { //nolint:gocritic // ignore
 	c.limitedUsers[user] = LimitInfo{
 		end:               time.Now().Unix() + int64(c.config.AutoSpeedLimitConfig.LimitDuration*60),
 		currentSpeedLimit: c.config.AutoSpeedLimitConfig.LimitSpeed,
 		originSpeedLimit:  user.SpeedLimit,
 	}
-	c.logger.Printf("Limit User: %s Speed: %d End: %s", c.buildUserTag(&user), c.config.AutoSpeedLimitConfig.LimitSpeed, time.Unix(c.limitedUsers[user].end, 0).Format("01-02 15:04:05"))
-	user.SpeedLimit = uint64((c.config.AutoSpeedLimitConfig.LimitSpeed * 1000000) / 8)
+	c.logger.Printf("Limit User: %s Speed: %d End: %s",
+		c.buildUserTag(&user),
+		c.config.AutoSpeedLimitConfig.LimitSpeed,
+		time.Unix(c.limitedUsers[user].end, 0).Format("01-02 15:04:05"))
+	user.SpeedLimit = uint64((c.config.AutoSpeedLimitConfig.LimitSpeed * 1000000) / 8) //nolint:gosec // ignore
 	*silentUsers = append(*silentUsers, user)
 }
 
@@ -510,7 +506,10 @@ func (c *Controller) userInfoMonitor() (err error) {
 				c.logger.Printf("User: %s Speed: %d End: nil (Unlimit)", c.buildUserTag(&user), user.SpeedLimit)
 				delete(c.limitedUsers, user)
 			} else {
-				c.logger.Printf("User: %s Speed: %d End: %s", c.buildUserTag(&user), limitInfo.currentSpeedLimit, time.Unix(c.limitedUsers[user].end, 0).Format("01-02 15:04:05"))
+				c.logger.Printf("User: %s Speed: %d End: %s",
+					c.buildUserTag(&user),
+					limitInfo.currentSpeedLimit,
+					time.Unix(c.limitedUsers[user].end, 0).Format("01-02 15:04:05"))
 			}
 		}
 		if len(toReleaseUsers) > 0 {
@@ -602,13 +601,8 @@ func (c *Controller) userInfoMonitor() (err error) {
 		} else {
 			c.logger.Printf("Report %d illegal behaviors", len(*detectResult))
 		}
-
 	}
 	return nil
-}
-
-func (c *Controller) buildNodeTag() string {
-	return fmt.Sprintf("%s_%s_%d", c.nodeInfo.NodeType, c.config.ListenIP, c.nodeInfo.Port)
 }
 
 // func (c *Controller) logPrefix() string {
@@ -617,9 +611,9 @@ func (c *Controller) buildNodeTag() string {
 
 // Check Cert
 func (c *Controller) certMonitor() error {
-	if c.nodeInfo.EnableTLS && c.config.EnableREALITY == false {
+	if c.nodeInfo.EnableTLS && !c.config.EnableREALITY {
 		switch c.config.CertConfig.CertMode {
-		case "dns", "http", "tls":
+		case mylego.CertModeHTTP, mylego.CertModeDNS, mylego.CertModeTLS:
 			lego, err := mylego.New(c.config.CertConfig)
 			if err != nil {
 				c.logger.Print(err)
