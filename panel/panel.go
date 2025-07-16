@@ -133,6 +133,7 @@ func (*Panel) loadCore(panelConfig *Config) *core.Instance {
 	corePolicyConfig := &conf.PolicyConfig{}
 	corePolicyConfig.Levels = map[uint32]*conf.Policy{0: levelPolicyConfig}
 	policyConfig, _ := corePolicyConfig.Build()
+
 	// Build Core Config
 	config := &core.Config{
 		App: []*serial.TypedMessage{
