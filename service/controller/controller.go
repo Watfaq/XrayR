@@ -417,7 +417,6 @@ func (c *Controller) addNewUser(userInfo *[]api.UserInfo, nodeInfo *api.NodeInfo
 			return err
 		}
 		c.logger.Printf("Added %d new users for tag %s", len(*userInfo), tag)
-
 	}
 	return nil
 }
