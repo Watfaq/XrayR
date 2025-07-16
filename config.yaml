@@ -17,6 +17,7 @@ Nodes:
       NodeID: test-node-westus-01.dev.slow-access.work
       NodeType: Shadowsocks-Plugin # Node type: V2ray, Trojan, Shadowsocks, Shadowsocks-Plugin
       Timeout: 30 # Timeout for the api request
+      PrivateIP: "192.168.1.100"
     ControllerConfig:
       ListenIP: 0.0.0.0 # local listen address
       SendIP: 0.0.0.0 # outbound interface ip

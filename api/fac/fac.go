@@ -61,8 +61,7 @@ func New(apiConfig *api.Config) *APIClient {
 	client.SetBaseURL(apiConfig.APIHost)
 	// Create Key for each requests
 	client.SetQueryParam("key", apiConfig.Key)
-	// Add support for muKey
-	client.SetQueryParam("muKey", apiConfig.Key)
+	client.SetQueryParam("private_ip", apiConfig.PrivateIP)
 	// Read local rule list
 	localRuleList := readLocalRuleList(apiConfig.RuleListPath)
 
