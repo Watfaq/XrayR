@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.10.0
-	github.com/xtls/xray-core v1.250306.0
+	github.com/xtls/xray-core v1.8.20
 	golang.org/x/crypto v0.36.0
 	golang.org/x/net v0.37.0
 	golang.org/x/time v0.7.0
@@ -98,6 +98,7 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/flosch/pongo2/v4 v4.0.2 // indirect
+	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/ghodss/yaml v1.0.1-0.20220118164431-d8423dcdf344 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
@@ -289,7 +290,7 @@ require (
 	gopkg.in/ns1/ns1-go.v2 v2.9.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gvisor.dev/gvisor v0.0.0-20240320123526-dc6abceb7ff0 // indirect
+	gvisor.dev/gvisor v0.0.0-20231202080848-1f7806d17489 // indirect
 	k8s.io/api v0.29.2 // indirect
 	k8s.io/apimachinery v0.29.2 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect

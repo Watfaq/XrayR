@@ -35,7 +35,7 @@ type Sniffer struct {
 func NewSniffer(ctx context.Context) *Sniffer {
 	ret := &Sniffer{
 		sniffer: []protocolSnifferWithMetadata{
-			{func(ctx context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b, ctx) }, false, net.Network_TCP},
+			{func(_ context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b) }, false, net.Network_TCP},
 			{func(_ context.Context, b []byte) (SniffResult, error) { return tls.SniffTLS(b) }, false, net.Network_TCP},
 			{func(_ context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffBittorrent(b) }, false, net.Network_TCP},
 			{func(_ context.Context, b []byte) (SniffResult, error) { return quic.SniffQUIC(b) }, false, net.Network_UDP},
