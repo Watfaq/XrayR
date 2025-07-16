@@ -89,10 +89,8 @@ func (c *Controller) buildSSUser(userInfo *[]api.UserInfo, method string) (users
 			users[i] = &protocol.User{
 				Level: 0,
 				Email: e,
-				Account: serial.ToTypedMessage(&shadowsocks_2022.User{
-					Key:   userKey,
-					Email: e,
-					Level: 0,
+				Account: serial.ToTypedMessage(&shadowsocks_2022.Account{
+					Key: userKey,
 				}),
 			}
 		} else {

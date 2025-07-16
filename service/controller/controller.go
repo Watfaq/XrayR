@@ -177,7 +177,7 @@ func (c *Controller) Start() error {
 func (c *Controller) Close() error {
 	for i := range c.tasks {
 		if c.tasks[i].Periodic != nil {
-			if err := c.tasks[i].Periodic.Close(); err != nil {
+			if err := c.tasks[i].Close(); err != nil {
 				c.logger.Panicf("%s periodic task close failed: %s", c.tasks[i].tag, err)
 			}
 		}
@@ -417,7 +417,6 @@ func (c *Controller) addNewUser(userInfo *[]api.UserInfo, nodeInfo *api.NodeInfo
 			return err
 		}
 		c.logger.Printf("Added %d new users for tag %s", len(*userInfo), tag)
-
 	}
 	return nil
 }
